@@ -1,0 +1,21 @@
+# Environment — never commit secrets
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Raw corpus files (large PDFs / source docs — add cleaned versions to corpus/clean/ only)
+corpus/raw/
+
+# Build output
+dist/
+build/
+*.js.map
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+.vscode/settings.json
