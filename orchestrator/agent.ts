@@ -22,7 +22,16 @@ export class Orchestrator {
   private history: Anthropic.MessageParam[] = [];
 
   constructor(client?: Anthropic, retriever?: Retriever) {
-    this.client = client ?? new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    this.client =
+      client ??
+      new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+        // Auto-retry transient API errors (429/5xx/overloaded/timeouts) with
+        // backoff, and fail a hung request fast so the retry can fire within
+        // the serverless time budget.
+        maxRetries: 3,
+        timeout: 25_000,
+      });
     this.ctx = { retriever: retriever ?? new Retriever() };
   }
 
