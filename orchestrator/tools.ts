@@ -4,6 +4,7 @@
  * Schema-constrained I/O means the model cannot smuggle a number into a result.
  */
 import type Anthropic from '@anthropic-ai/sdk';
+import { createClient } from '@supabase/supabase-js';
 import { calculate, calculatePurchase } from '../engine/index.js';
 import { validateCalcInput, validatePurchaseInput } from '../engine/validate.js';
 import { Retriever } from './retriever.js';
@@ -57,6 +58,22 @@ export const toolDefs: Anthropic.Tool[] = [
         yearsOfService: { type: 'number', description: 'Current service years (purchase eligibility needs >= 20).' },
       },
       required: ['kind', 'contributionSalary', 'years', 'gender'],
+    },
+  },
+  {
+    name: 'raise_support_request',
+    description:
+      "Create a callback request so an SSSF officer contacts the user. Use ONLY when you cannot answer/help from the corpus or tools AND the user has agreed to be contacted. Collect the user's full name and mobile number first (both REQUIRED). Do not call this for questions you can already answer.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: "User's full name (required)." },
+        mobile: { type: 'string', description: 'Mobile number (required).' },
+        email: { type: 'string', description: 'Email (optional).' },
+        topic: { type: 'string', description: 'Short subject of the request.' },
+        details: { type: 'string', description: 'What the user needs / their question.' },
+      },
+      required: ['name', 'mobile'],
     },
   },
 ];
@@ -118,6 +135,38 @@ export async function executeTool(
         });
       }
       return JSON.stringify(calculatePurchase(v.value));
+    }
+
+    case 'raise_support_request': {
+      const name = String(input.name ?? '').trim();
+      const mobile = String(input.mobile ?? '').trim();
+      if (!name || !mobile) {
+        return JSON.stringify({
+          error: 'missing_contact',
+          message: 'Name and mobile number are both required. Ask the user for the missing one before raising the request.',
+        });
+      }
+      const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+      const { data, error } = await supabase
+        .from('support_request')
+        .insert({
+          channel: 'agent',
+          name,
+          mobile,
+          email: input.email ? String(input.email) : null,
+          topic: input.topic ? String(input.topic) : null,
+          details: input.details ? String(input.details) : null,
+        })
+        .select('id')
+        .single();
+      if (error) {
+        return JSON.stringify({ error: 'save_failed', message: 'Could not save the request. Apologize and suggest trying again later.' });
+      }
+      return JSON.stringify({
+        ok: true,
+        reference: `REQ-${data!.id}`,
+        message: 'Request saved. Tell the user an officer will contact them, and give them the reference number.',
+      });
     }
 
     default:

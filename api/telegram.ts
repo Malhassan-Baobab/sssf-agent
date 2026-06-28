@@ -20,9 +20,12 @@ import {
 export const config = { maxDuration: 60 };
 
 const WELCOME =
-  'أهلاً بك في مساعد صندوق الشارقة للضمان الاجتماعي 👋\n' +
-  'اسألني عن المعاش، نهاية الخدمة، شراء الخدمة، أو احسب تقديرك.\n\n' +
-  'Welcome to the SSSF assistant. Ask about pensions, end-of-service, or run an estimate.\n' +
+  'أهلاً بك، أنا المساعد الذكي لصندوق الشارقة للضمان الاجتماعي 👋\n' +
+  'أستطيع مساعدتك في:\n' +
+  '• أسئلة المعاش ونهاية الخدمة والاشتراكات والمستحقين\n' +
+  '• حساب تقديري للمعاش أو مكافأة نهاية الخدمة أو شراء/ضم الخدمة\n' +
+  '• معلومات الصندوق وطلب الشهادات\n\n' +
+  "I'm the SSSF Smart Assistant — ask about pensions, end-of-service, contributions, or run an estimate.\n" +
   '(اكتب /reset لبدء محادثة جديدة)';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
