@@ -5,7 +5,7 @@
  */
 import type Anthropic from '@anthropic-ai/sdk';
 import { calculate, calculatePurchase } from '../engine/index.js';
-import type { CalcInput, PurchaseInput } from '../engine/index.js';
+import { validateCalcInput, validatePurchaseInput } from '../engine/validate.js';
 import { Retriever } from './retriever.js';
 
 export const toolDefs: Anthropic.Tool[] = [
@@ -97,13 +97,27 @@ export async function executeTool(
     }
 
     case 'calculate_pension_or_eos': {
-      const result = calculate(input as unknown as CalcInput);
-      return JSON.stringify(result);
+      const v = validateCalcInput(input);
+      if (!v.ok) {
+        return JSON.stringify({
+          error: 'invalid_input',
+          issues: v.issues,
+          message: 'One or more inputs look out of range. Ask the user to re-check before computing.',
+        });
+      }
+      return JSON.stringify(calculate(v.value));
     }
 
     case 'calculate_purchase_or_addition': {
-      const result = calculatePurchase(input as unknown as PurchaseInput);
-      return JSON.stringify(result);
+      const v = validatePurchaseInput(input);
+      if (!v.ok) {
+        return JSON.stringify({
+          error: 'invalid_input',
+          issues: v.issues,
+          message: 'One or more inputs look out of range. Ask the user to re-check before computing.',
+        });
+      }
+      return JSON.stringify(calculatePurchase(v.value));
     }
 
     default:
