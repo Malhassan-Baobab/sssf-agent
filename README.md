@@ -123,6 +123,19 @@ npx tsx scripts/ingest-faq.ts        # embed 40 Q&A, auto-link citations
 npx tsx scripts/search.ts "سؤال" 5   # retrieval smoke test
 ```
 
+## Orchestrator (`orchestrator/`)
+
+LLM that routes between the two pillars and never owns facts or numbers. It can only
+act through the typed tool boundary: `search_policy` (RAG + graph expansion, abstains
+below confidence threshold) and the two calc tools (deterministic engine). The system
+prompt enforces closed-domain, mandatory citation, confirm-before-compute, no mental
+math, and bilingual elderly-friendly tone.
+
+```bash
+npx tsx orchestrator/cli.ts                 # interactive REPL
+npx tsx orchestrator/cli.ts "ما هو الحد الأدنى للمعاش؟"   # one-shot
+```
+
 ## Anti-hallucination rules
 
 1. **Closed domain** — answer only from the RAG corpus and tool outputs.
