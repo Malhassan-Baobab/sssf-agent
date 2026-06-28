@@ -68,8 +68,22 @@ Files here are quality-passed, chunking-ready. Each corresponds to a `doc_key` a
 |---|---|---|
 | *(populated by ingestion scripts)* | | |
 
-## OCR backlog
+## OCR backlog & data-quality finding
 
-Decisions 9/70/71, contributions guide, HR exec reg + appendices, Form 3/4.
-Priority: exec reg > contributions guide > decisions > forms.
-Approach: run through Tesseract (`ara` lang) or GPT-4o Vision, verify each article reads correctly before adding to `corpus/clean/`.
+**Finding (2026-06-28):** the contributions procedures guide, board decisions 9/70/71,
+and the HR executive regulation PDFs have a **corrupt text layer** — exported with a
+custom font glyph encoding, so both pdfplumber and PyMuPDF return scrambled Arabic
+(`ܦج Ȗ`, `ʈﺔ`, reversed URLs). **Raw extraction must NOT be embedded** — it would
+pollute retrieval. The visual rendering is correct.
+
+**Verified OCR path:** `scripts/render-pdf-pages.py` renders pages to clean PNGs →
+OCR with Tesseract `ara` (or a vision LLM) → **article/section-level verification**
+before writing to `corpus/clean/` and embedding.
+
+Priority: HR exec reg > contributions guide > decisions > forms.
+
+**Why not blocking the pilot:** the pensioner-facing essence of these procedures is
+already captured cleanly in (a) the law itself (Arts. 6, 7, 20 for addition/purchase),
+(b) the `service` catalog (`form_3_service_addition`, `form_4_purchase` — inputs +
+required attachments + legal basis), and (c) the FAQ. The procedures guide adds
+staff-facing operational detail (Pillar 3), scheduled after the calc engine.
