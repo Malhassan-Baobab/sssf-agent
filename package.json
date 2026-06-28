@@ -11,6 +11,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
+    "test:calc": "tsx engine/calc.test.ts",
     "chunk:law-ar": "tsx scripts/chunk-law.ts --file \"corpus/raw/قانون الضمان بالعناوين.docx\" --doc-key law_5_2018_ar --lang ar --authority \"Law 5/2018\" --out corpus/clean/law_5_2018_ar.jsonl",
     "chunk:law-en": "tsx scripts/chunk-law.ts --file \"corpus/raw/English SSSF Law word.docx\" --doc-key law_5_2018_en --lang en --authority \"Law 5/2018\" --out corpus/clean/law_5_2018_en.jsonl",
     "ingest": "tsx scripts/ingest.ts"

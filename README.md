@@ -97,6 +97,22 @@ select count(*) from calc_constant where config_version = 'final_v1';    -- expe
 
 Retrieval primitives: `match_law_chunks()`, `match_faq()`, `match_procedures()` (cosine over HNSW).
 
+## Deterministic calc engine (`engine/`)
+
+Pure, typed functions — the model never does arithmetic. Decoded from the Final Version
+calculator and cross-checked to Law 5/2018. Covers pension (Art. 23), the Art. 26 minimum
+floor, early-retirement reduction (Art. 19 ج/د), end-of-service gratuity (Art. 43), reward
+beyond 35 years (Art. 23), and purchase/addition cost (Art. 20 / 6-7). Every result carries
+its citations.
+
+```bash
+npm run test:calc    # validates all 22 oracle cases (Calc_TestCases.xlsx)
+```
+
+> The oracle's own Expected/Actual columns disagree on several rows (spreadsheet bugs).
+> The engine implements the **law-correct** value and the divergences are documented in
+> `engine/calc.test.ts` for officer review.
+
 ## Corpus pipeline
 
 ```bash
