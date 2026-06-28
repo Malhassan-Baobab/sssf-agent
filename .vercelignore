@@ -1,0 +1,7 @@
+# Nothing here is needed at runtime — the corpus lives in Supabase.
+corpus/
+SSSF Docs/
+docs/
+eval/
+.git/
+*.md

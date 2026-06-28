@@ -74,4 +74,14 @@ export class Orchestrator {
   reset(): void {
     this.history = [];
   }
+
+  /** Load prior conversation state (for stateless/serverless use). */
+  hydrate(history: Anthropic.MessageParam[]): void {
+    this.history = history;
+  }
+
+  /** Current conversation state, to persist between serverless invocations. */
+  getHistory(): Anthropic.MessageParam[] {
+    return this.history;
+  }
 }
