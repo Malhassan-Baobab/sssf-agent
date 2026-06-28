@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+    <title>المساعد الذكي — صندوق الشارقة للضمان الاجتماعي</title>
+    <style>
+      :root { --bg:#f4f6f9; --card:#fff; --me:#0a7d4d; --bot:#eef1f5; --txt:#1a2230; --muted:#7b8694; --line:#e3e8ef; }
+      * { box-sizing: border-box; }
+      html, body { margin:0; height:100%; background:var(--bg); font-family: "Segoe UI", Tahoma, Arial, sans-serif; color:var(--txt); }
+      #app { display:flex; flex-direction:column; height:100dvh; max-width:760px; margin:0 auto; background:var(--card); }
+      header { padding:14px 16px; background:var(--me); color:#fff; display:flex; align-items:center; gap:10px; }
+      header .dot { width:9px; height:9px; border-radius:50%; background:#7CFFB2; }
+      header h1 { font-size:16px; margin:0; font-weight:600; }
+      header small { display:block; font-weight:400; opacity:.85; font-size:12px; }
+      #log { flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:10px; }
+      .msg { max-width:85%; padding:10px 13px; border-radius:14px; line-height:1.55; white-space:pre-wrap; word-wrap:break-word; font-size:15px; }
+      .me { align-self:flex-start; background:var(--me); color:#fff; border-bottom-right-radius:4px; }
+      .bot { align-self:flex-end; background:var(--bot); border-bottom-left-radius:4px; }
+      .bot a { color:var(--me); }
+      .hint { text-align:center; color:var(--muted); font-size:12.5px; margin:6px 0; }
+      form { display:flex; gap:8px; padding:12px; border-top:1px solid var(--line); background:var(--card); }
+      #box { flex:1; resize:none; border:1px solid var(--line); border-radius:12px; padding:11px 13px; font:inherit; max-height:120px; }
+      #send { border:0; background:var(--me); color:#fff; border-radius:12px; padding:0 18px; font:inherit; font-weight:600; cursor:pointer; }
+      #send:disabled { opacity:.5; cursor:default; }
+      .typing { align-self:flex-end; color:var(--muted); font-size:13px; padding:4px 6px; }
+      #gate { position:absolute; inset:0; background:rgba(244,246,249,.97); display:flex; align-items:center; justify-content:center; }
+      #gate .card { background:#fff; padding:22px; border-radius:14px; width:300px; box-shadow:0 8px 30px rgba(0,0,0,.12); text-align:center; }
+      #gate input { width:100%; padding:10px; border:1px solid var(--line); border-radius:10px; margin:12px 0; font:inherit; text-align:center; }
+      #gate button { width:100%; border:0; background:var(--me); color:#fff; padding:10px; border-radius:10px; font:inherit; font-weight:600; cursor:pointer; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header>
+        <span class="dot"></span>
+        <div><h1>المساعد الذكي</h1><small>صندوق الشارقة للضمان الاجتماعي · SSSF</small></div>
+      </header>
+      <div id="log">
+        <div class="hint">بيانات تجريبية فقط — لا تُدخل بيانات شخصية حقيقية · Sample data only</div>
+      </div>
+      <form id="f">
+        <textarea id="box" rows="1" placeholder="اكتب سؤالك هنا… / Type your question…" autocomplete="off"></textarea>
+        <button id="send" type="submit">إرسال</button>
+      </form>
+    </div>
+
+    <div id="gate" hidden>
+      <div class="card">
+        <div>رمز الدخول / Access code</div>
+        <input id="code" type="password" placeholder="••••••" />
+        <button id="enter">دخول / Enter</button>
+      </div>
+    </div>
+
+    <script>
+      const log = document.getElementById('log');
+      const form = document.getElementById('f');
+      const box = document.getElementById('box');
+      const send = document.getElementById('send');
+      let history = [];
+      let accessCode = sessionStorage.getItem('sssf_code') || '';
+
+      const WELCOME =
+        'أهلاً بك، أنا المساعد الذكي لصندوق الشارقة للضمان الاجتماعي.\nاسألني عن المعاش، نهاية الخدمة، الاشتراكات، الشهادات، أو احسب تقديرك.';
+
+      function bubble(text, who) {
+        const d = document.createElement('div');
+        d.className = 'msg ' + who;
+        // linkify URLs
+        d.innerHTML = text
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/(https?:\/\/[^\s]+|[a-z0-9.-]+\.shj\.ae[^\s]*)/gi, (u) => {
+            const href = u.startsWith('http') ? u : 'https://' + u;
+            return '<a href="' + href + '" target="_blank" rel="noopener">' + u + '</a>';
+          });
+        log.appendChild(d);
+        log.scrollTop = log.scrollHeight;
+      }
+      bubble(WELCOME, 'bot');
+
+      box.addEventListener('input', () => { box.style.height = 'auto'; box.style.height = box.scrollHeight + 'px'; });
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const msg = box.value.trim();
+        if (!msg) return;
+        bubble(msg, 'me');
+        box.value = ''; box.style.height = 'auto';
+        send.disabled = true;
+        const t = document.createElement('div');
+        t.className = 'typing'; t.textContent = '… يكتب';
+        log.appendChild(t); log.scrollTop = log.scrollHeight;
+        try {
+          const r = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ message: msg, history, code: accessCode }),
+          });
+          if (r.status === 401) {
+            t.remove(); send.disabled = false;
+            document.getElementById('gate').hidden = false;
+            return;
+          }
+          const data = await r.json();
+          t.remove();
+          bubble(data.reply, 'bot');
+          history.push({ role: 'user', content: msg }, { role: 'assistant', content: data.reply });
+          history = history.slice(-24);
+        } catch (err) {
+          t.remove();
+          bubble('تعذّر الاتصال، حاول مرة أخرى. / Connection error, please retry.', 'bot');
+        } finally {
+          send.disabled = false; box.focus();
+        }
+      });
+
+      // Access-code gate (only shown if the server requires one)
+      document.getElementById('enter').addEventListener('click', () => {
+        accessCode = document.getElementById('code').value.trim();
+        sessionStorage.setItem('sssf_code', accessCode);
+        document.getElementById('gate').hidden = true;
+        box.focus();
+      });
+    </script>
+  </body>
+</html>
