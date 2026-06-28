@@ -49,9 +49,44 @@ const PURCHASE = [
   { id: 'AP05', salary: 18000, years: 6, expect: 259200 },
 ];
 
+// Purchase/addition eligibility (Art. 20 / 6-7) — beyond the pure cost formula.
+interface PurchaseElig {
+  id: string;
+  kind: 'purchase' | 'addition';
+  gender: Gender;
+  years: number;
+  yearsOfService?: number;
+  salary: number;
+  expectEligible: boolean;
+  expectCost: number;
+}
+const PURCHASE_ELIG: PurchaseElig[] = [
+  { id: 'PE01', kind: 'purchase', gender: 'male', years: 5, yearsOfService: 22, salary: 12000, expectEligible: true, expectCost: 144000 },
+  { id: 'PE02', kind: 'purchase', gender: 'male', years: 6, yearsOfService: 22, salary: 12000, expectEligible: false, expectCost: 172800 }, // > 5 male max
+  { id: 'PE03', kind: 'purchase', gender: 'female', years: 10, yearsOfService: 25, salary: 15000, expectEligible: true, expectCost: 360000 },
+  { id: 'PE04', kind: 'purchase', gender: 'female', years: 11, yearsOfService: 25, salary: 15000, expectEligible: false, expectCost: 396000 }, // > 10 female max
+  { id: 'PE05', kind: 'purchase', gender: 'male', years: 3, yearsOfService: 18, salary: 10000, expectEligible: false, expectCost: 72000 }, // < 20 yrs service
+  { id: 'PE06', kind: 'addition', gender: 'male', years: 4, salary: 10000, expectEligible: true, expectCost: 96000 }, // addition has no purchase caps
+];
+
 let pass = 0;
 let fail = 0;
 const fails: string[] = [];
+
+for (const t of PURCHASE_ELIG) {
+  const r = calculatePurchase({
+    kind: t.kind,
+    contributionSalary: t.salary,
+    years: t.years,
+    gender: t.gender,
+    yearsOfService: t.yearsOfService,
+  });
+  if (r.eligible === t.expectEligible && r.cost === t.expectCost) pass++;
+  else {
+    fail++;
+    fails.push(`${t.id}: got {eligible:${r.eligible}, cost:${r.cost}} expected {eligible:${t.expectEligible}, cost:${t.expectCost}}`);
+  }
+}
 
 for (const t of PENSION) {
   const input: CalcInput = {
@@ -92,7 +127,7 @@ for (const t of PURCHASE) {
   }
 }
 
-console.log(`Calc engine validation: ${pass} passed, ${fail} failed (of ${pass + fail}).`);
+console.log(`Calc engine validation: ${pass} passed, ${fail} failed (of ${pass + fail}) — incl. purchase/addition eligibility.`);
 if (fails.length) {
   console.log('\nFailures:');
   fails.forEach((f) => console.log('  ✗ ' + f));
