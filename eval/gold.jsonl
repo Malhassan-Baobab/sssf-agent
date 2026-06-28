@@ -1,0 +1,17 @@
+{"id":"POL01","type":"policy","lang":"ar","question":"ما هو الحد الأدنى لمعاش التقاعد؟","expectArticles":["26"],"note":"min pension 17500"}
+{"id":"POL02","type":"policy","lang":"ar","question":"كم نسبة الاشتراك الشهري على الموظف وصاحب العمل؟","expectArticles":["4"],"note":"5% employee / 15% employer"}
+{"id":"POL03","type":"policy","lang":"ar","question":"ما هي سن الإحالة إلى التقاعد للرجل والمرأة؟","expectArticles":["1"],"note":"60 male / 55 female (definitions)"}
+{"id":"POL04","type":"policy","lang":"ar","question":"كيف يُحسب المعاش الشهري؟","expectArticles":["23"],"note":"60% at 15y +2%/yr cap 100%"}
+{"id":"POL05","type":"policy","lang":"ar","question":"كيف تُحسب مكافأة نهاية الخدمة؟","expectArticles":["43"],"note":"1.5/2/3 month tiers"}
+{"id":"POL06","type":"policy","lang":"ar","question":"كم أقصى عدد سنوات يمكن شراؤها للرجل والمرأة؟","expectArticles":["20"],"note":"5 male / 10 female, min 20y service"}
+{"id":"POL07","type":"policy","lang":"ar","question":"من هم المستحقون للمعاش بعد وفاة المؤمن عليه؟","expectArticles":["27"],"note":"beneficiaries list"}
+{"id":"POL08","type":"policy","lang":"ar","question":"متى ينقطع معاش الابن؟","expectArticles":["32"],"note":"age 21, student to 28"}
+{"id":"POL09","type":"policy","lang":"ar","question":"هل يجوز الجمع بين معاشين؟","expectArticles":["39","40"],"note":"no double pension, exceptions"}
+{"id":"POL10","type":"policy","lang":"ar","question":"كم تعويض الوفاة الطبيعية؟","expectArticles":["57"],"note":"60000 AED"}
+{"id":"POL11","type":"policy","lang":"ar","question":"كم تعويض الوفاة بسبب إصابة عمل؟","expectArticles":["58"],"note":"100000 AED"}
+{"id":"POL12","type":"policy","lang":"en","question":"What are the conditions for a woman to receive a pension if she resigns?","expectArticles":["19"],"note":"Art 19 د/ه"}
+{"id":"POL13","type":"policy","lang":"en","question":"What happens to the pension when a widow remarries?","expectArticles":["33"],"note":"suspended on remarriage"}
+{"id":"POL14","type":"policy","lang":"en","question":"What is the late-payment penalty for contributions?","expectArticles":["17"],"note":"0.1% per day"}
+{"id":"ABS01","type":"abstain","lang":"ar","question":"كم تكلفة تجديد جواز السفر الإماراتي؟","note":"out of domain — passport"}
+{"id":"ABS02","type":"abstain","lang":"en","question":"What is the weather in Sharjah today?","note":"out of domain — weather"}
+{"id":"ABS03","type":"abstain","lang":"ar","question":"ما هي شروط الحصول على تأشيرة زيارة لدبي؟","note":"out of domain — visa"}

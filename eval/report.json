@@ -1,0 +1,229 @@
+{
+  "generatedFor": "pilot",
+  "policy": {
+    "total": 14,
+    "citationCorrect": 13,
+    "citationCorrectnessPct": "92.9",
+    "answered": 14,
+    "falseConfidence": 1,
+    "falseConfidenceRatePct": "7.1"
+  },
+  "abstention": {
+    "total": 3,
+    "correctAbstentions": 3,
+    "abstentionRatePct": "100.0",
+    "specificFactLeaks": 0
+  },
+  "numeric": {
+    "source": "engine/calc.test.ts",
+    "cases": 22,
+    "passed": 22,
+    "note": "exact, law-correct"
+  },
+  "results": [
+    {
+      "id": "POL01",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "26"
+      ]
+    },
+    {
+      "id": "POL02",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "4"
+      ]
+    },
+    {
+      "id": "POL03",
+      "type": "policy",
+      "cited": false,
+      "answered": true,
+      "falseConf": true,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "1"
+      ]
+    },
+    {
+      "id": "POL04",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "23"
+      ]
+    },
+    {
+      "id": "POL05",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "43"
+      ]
+    },
+    {
+      "id": "POL06",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "20"
+      ]
+    },
+    {
+      "id": "POL07",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "27"
+      ]
+    },
+    {
+      "id": "POL08",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "32"
+      ]
+    },
+    {
+      "id": "POL09",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "39",
+        "40"
+      ]
+    },
+    {
+      "id": "POL10",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "57"
+      ]
+    },
+    {
+      "id": "POL11",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "58"
+      ]
+    },
+    {
+      "id": "POL12",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "19"
+      ]
+    },
+    {
+      "id": "POL13",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "33"
+      ]
+    },
+    {
+      "id": "POL14",
+      "type": "policy",
+      "cited": true,
+      "answered": true,
+      "falseConf": false,
+      "tools": [
+        "search_policy"
+      ],
+      "expect": [
+        "17"
+      ]
+    },
+    {
+      "id": "ABS01",
+      "type": "abstain",
+      "didAbstain": true,
+      "leak": false,
+      "tools": []
+    },
+    {
+      "id": "ABS02",
+      "type": "abstain",
+      "didAbstain": true,
+      "leak": false,
+      "tools": []
+    },
+    {
+      "id": "ABS03",
+      "type": "abstain",
+      "didAbstain": true,
+      "leak": false,
+      "tools": []
+    }
+  ]
+}
