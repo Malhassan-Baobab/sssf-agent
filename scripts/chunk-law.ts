@@ -52,7 +52,7 @@ function parseArgs(): Record<string, string> {
  * Returns { no: '19', title: rest_of_line } or null.
  */
 function parseArticleLine(line: string): { no: string; title: string } | null {
-  const m = line.match(/(?:المادة|مادة)\s*[\(（]?(\d+)[\)）]?\s*[:\-–]?\s*(.*)/u);
+  const m = line.match(/^\s*(?:المادة|مادة)\s*[\(（]?(\d+)[\)）]?\s*[:\-–]?\s*(.*)/u);
   if (m) return { no: m[1].trim(), title: m[2].trim() };
   return null;
 }
@@ -71,9 +71,9 @@ function parseArticleLineEn(line: string): { no: string; title: string } | null 
  * English chapter: "Chapter 1" / "Part I"
  */
 function parseChapterLine(line: string): { no: string; title: string } | null {
-  const arM = line.match(/(?:الفصل|الباب|القسم)\s+(\S+)\s*(.*)/u);
+  const arM = line.match(/^\s*(?:الفصل|الباب|القسم)\s+([^\s:]+)\s*:?\s*(.*)/u);
   if (arM) return { no: arM[1].trim(), title: arM[2].trim() };
-  const enM = line.match(/(?:Chapter|Part|Section)\s+(\S+)\s*(.*)/i);
+  const enM = line.match(/^\s*(?:Chapter|Part|Section)\s+(\S+)\s*(.*)/i);
   if (enM) return { no: enM[1].trim(), title: enM[2].trim() };
   return null;
 }
@@ -110,11 +110,8 @@ async function chunkLaw(opts: {
   const isAr = lang === 'ar';
   const parseArt = isAr ? parseArticleLine : parseArticleLineEn;
 
-  function flushArticle() {
-    if (!currentArticleNo || buffer.length === 0) return;
-    const content = buffer.join('\n').trim();
-    if (!content) return;
-    const citation = `${authority}, Art. ${currentArticleNo}`;
+  function pushChunk(clause: string | null, content: string, citationSuffix = '') {
+    const citation = `${authority}, Art. ${currentArticleNo}${citationSuffix}`;
     chunks.push({
       doc_key: docKey,
       language: lang,
@@ -123,11 +120,59 @@ async function chunkLaw(opts: {
       chapter_title: currentChapterTitle,
       article_no: currentArticleNo,
       article_title: currentArticleTitle,
-      clause: null,
+      clause,
       content,
       citation,
       version,
     });
+  }
+
+  /**
+   * Article 1 is a glossary. Split it into one chunk per defined term so a query
+   * about a single term retrieves only its definition. A new term starts on a line
+   * that has a colon whose left side is short and does not begin with an
+   * enumerator (أ-/ب-/ج-/د-/ه-/1-/2-...), which keeps multi-clause definitions
+   * (e.g. راتب حساب الاشتراك أ/ب/ج) grouped under their term.
+   */
+  function flushDefinitions(allLines: string[]) {
+    const enumStart = /^\s*(?:[أبجدهوزحطي]|\d+)\s*[-–.]/u;
+    let term: string | null = null;
+    let defBuf: string[] = [];
+    const flushTerm = () => {
+      if (term && defBuf.length) {
+        pushChunk(term, `${term}: ${defBuf.join('\n').trim()}`, ` — ${term}`);
+      }
+    };
+    for (const line of allLines) {
+      const colonIdx = line.indexOf(':');
+      const isNewTerm =
+        colonIdx > 0 &&
+        colonIdx <= 40 &&
+        !enumStart.test(line) &&
+        line.slice(0, colonIdx).split(/\s+/).length <= 6;
+      if (isNewTerm) {
+        flushTerm();
+        term = line.slice(0, colonIdx).trim();
+        defBuf = [line.slice(colonIdx + 1).trim()].filter(Boolean);
+      } else if (term) {
+        defBuf.push(line);
+      }
+    }
+    flushTerm();
+  }
+
+  function flushArticle() {
+    if (!currentArticleNo || buffer.length === 0) return;
+    const content = buffer.join('\n').trim();
+    if (!content) {
+      buffer = [];
+      return;
+    }
+    if (currentArticleNo === '1' && lang === 'ar') {
+      flushDefinitions(buffer);
+    } else {
+      pushChunk(null, content);
+    }
     buffer = [];
   }
 

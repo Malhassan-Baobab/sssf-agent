@@ -73,15 +73,39 @@ select count(*) from calc_constant where config_version = 'final_v1';    -- expe
 
 ## DB schema overview
 
+**RAG + relationship graph** (see Notion "09 · Knowledge Data Model & Retrieval"):
+
 | Table | Purpose |
 |---|---|
 | `source_documents` | Metadata per ingested document (law, regulation, FAQ) |
-| `law_chunks` | Article/clause chunks with 1536-dim embeddings for RAG |
-| `faq` | High-confidence Q&A pairs with embeddings (fast-path retrieval) |
+| `law_chunks` | Article/clause chunks with 1536-dim embeddings (Art. 1 split per definition) |
+| `procedure_chunks` | Steps from the contributions procedures guide (embedded) |
+| `faq` | Q&A fast-path with embeddings + auto-linked `article_refs` |
+| `service` | Form/certificate catalog (legal_basis, calc_type, inputs, attachments) |
+| `topic` | Thematic concepts spanning all layers |
+| `chunk_topic` / `faq_topic` / `procedure_topic` / `service_topic` | Many-to-many topic tags |
+| `article_xref` | Directed article→article cross-reference graph |
+
+**Deterministic calc config** (versioned):
+
+| Table | Purpose |
+|---|---|
 | `calc_config_version` | Versioned calc config snapshot (audit trail) |
 | `yos_percentage` | Years-of-service → pension % lookup |
 | `age_percentage` | Age + gender → pension % lookup |
 | `calc_constant` | Named constants (min pension, EoS tiers, purchase rules, etc.) |
+
+Retrieval primitives: `match_law_chunks()`, `match_faq()`, `match_procedures()` (cosine over HNSW).
+
+## Corpus pipeline
+
+```bash
+npm run chunk:law-ar                 # docx → corpus/clean/law_5_2018_ar.jsonl (article/definition chunks)
+npm run ingest -- --jsonl corpus/clean/law_5_2018_ar.jsonl --doc-key law_5_2018_ar \
+  --doc-title-ar "..." --doc-type law --effective-date 2018-04-08 --lang ar
+npx tsx scripts/ingest-faq.ts        # embed 40 Q&A, auto-link citations
+npx tsx scripts/search.ts "سؤال" 5   # retrieval smoke test
+```
 
 ## Anti-hallucination rules
 
