@@ -66,10 +66,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
     await sendChatAction(chatId, 'typing');
 
+    // Persist only a clean text transcript — never tool_use/tool_result blocks,
+    // which break the conversation if trimming ever orphans a pair.
+    const prior = await loadHistory(chatId);
     const agent = new Orchestrator();
-    agent.hydrate(await loadHistory(chatId));
+    agent.hydrate(prior);
     const turn = await agent.send(text);
-    await saveHistory(chatId, agent.getHistory());
+    await saveHistory(chatId, [
+      ...prior,
+      { role: 'user', content: text },
+      { role: 'assistant', content: turn.reply || '…' },
+    ]);
 
     await sendMessage(chatId, turn.reply || '…');
     res.status(200).json({ ok: true });

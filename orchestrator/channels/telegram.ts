@@ -49,7 +49,10 @@ export async function loadHistory(chatId: string): Promise<Anthropic.MessagePara
 }
 
 export async function saveHistory(chatId: string, history: Anthropic.MessageParam[]): Promise<void> {
-  const trimmed = history.slice(-MAX_HISTORY_MESSAGES);
+  // Trim to the last N messages, then drop any leading non-user messages so the
+  // stored history always starts with a 'user' turn (Anthropic requires this).
+  let trimmed = history.slice(-MAX_HISTORY_MESSAGES);
+  while (trimmed.length && trimmed[0].role !== 'user') trimmed = trimmed.slice(1);
   await db()
     .from('chat_session')
     .upsert(
