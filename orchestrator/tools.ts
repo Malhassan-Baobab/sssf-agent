@@ -5,8 +5,8 @@
  */
 import type Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
-import { calculate, calculatePurchase } from '../engine/index.js';
-import { validateCalcInput, validatePurchaseInput } from '../engine/validate.js';
+import { calculate, calculatePurchase, analyzeRetirement } from '../engine/index.js';
+import { validateCalcInput, validatePurchaseInput, validateRetirementInput } from '../engine/validate.js';
 import { Retriever } from './retriever.js';
 
 export const toolDefs: Anthropic.Tool[] = [
@@ -58,6 +58,22 @@ export const toolDefs: Anthropic.Tool[] = [
         yearsOfService: { type: 'number', description: 'Current service years (purchase eligibility needs >= 20).' },
       },
       required: ['kind', 'contributionSalary', 'years', 'gender'],
+    },
+  },
+  {
+    name: 'analyze_retirement',
+    description:
+      "Retirement-eligibility PLANNER for a person who is still working. Use this when the user asks 'when can I retire', whether they qualify, or gives their gender/age/years (and optionally salary) WITHOUT saying their service already ended. Returns: whether they qualify for a pension today, the earliest dates/ages they qualify (and what's blocking it), what happens at retirement age, and whether buying nominal service helps. Use calculate_pension_or_eos instead only when the person's service has ALREADY ended and they want the final figure.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        gender: { type: 'string', enum: ['male', 'female'] },
+        age: { type: 'number', description: 'Current age in years.' },
+        yearsOfService: { type: 'number', description: 'Current contribution years so far.' },
+        contributionSalary: { type: 'number', description: 'Optional monthly salary, for an amount illustration.' },
+        hasChildrenUnder18: { type: 'boolean', description: 'For women (Art. 19 ه path).' },
+      },
+      required: ['gender', 'age', 'yearsOfService'],
     },
   },
   {
@@ -135,6 +151,18 @@ export async function executeTool(
         });
       }
       return JSON.stringify(calculatePurchase(v.value));
+    }
+
+    case 'analyze_retirement': {
+      const v = validateRetirementInput(input);
+      if (!v.ok) {
+        return JSON.stringify({
+          error: 'invalid_input',
+          issues: v.issues,
+          message: 'One or more inputs look out of range. Ask the user to re-check.',
+        });
+      }
+      return JSON.stringify(analyzeRetirement(v.value));
     }
 
     case 'raise_support_request': {

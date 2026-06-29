@@ -8,6 +8,7 @@
  * Run: npx tsx engine/calc.test.ts
  */
 import { calculate, calculatePurchase } from './calc.js';
+import { analyzeRetirement } from './retirement.js';
 import type { CalcInput, Gender } from './types.js';
 
 interface PensionCase {
@@ -127,7 +128,35 @@ for (const t of PURCHASE) {
   }
 }
 
-console.log(`Calc engine validation: ${pass} passed, ${fail} failed (of ${pass + fail}) — incl. purchase/addition eligibility.`);
+// Retirement planning (deterministic) — eligibility timing & purchase insight.
+interface RetCase {
+  id: string;
+  i: { gender: Gender; age: number; yearsOfService: number; hasChildrenUnder18?: boolean };
+  eligibleNow: boolean;
+  earliestFutureYears?: number; // soonest milestone with yearsFromNow > 0
+  retAgeOutcome: 'pension' | 'gratuity';
+}
+const RET: RetCase[] = [
+  { id: 'RT01', i: { gender: 'male', age: 50, yearsOfService: 20 }, eligibleNow: true, earliestFutureYears: 5, retAgeOutcome: 'pension' },
+  { id: 'RT02', i: { gender: 'male', age: 45, yearsOfService: 12 }, eligibleNow: false, earliestFutureYears: 8, retAgeOutcome: 'pension' },
+  { id: 'RT03', i: { gender: 'female', age: 47, yearsOfService: 18 }, eligibleNow: false, earliestFutureYears: 2, retAgeOutcome: 'pension' },
+  { id: 'RT04', i: { gender: 'female', age: 47, yearsOfService: 18, hasChildrenUnder18: true }, eligibleNow: true, retAgeOutcome: 'pension' },
+  { id: 'RT05', i: { gender: 'male', age: 62, yearsOfService: 12 }, eligibleNow: false, earliestFutureYears: 3, retAgeOutcome: 'gratuity' },
+];
+for (const t of RET) {
+  const a = analyzeRetirement(t.i);
+  const future = a.milestones.filter((m) => m.yearsFromNow > 0)[0];
+  const okElig = a.eligibleNow === t.eligibleNow;
+  const okRet = a.guaranteedAtRetirementAge.outcome === t.retAgeOutcome;
+  const okFuture = t.earliestFutureYears == null || future?.yearsFromNow === t.earliestFutureYears;
+  if (okElig && okRet && okFuture) pass++;
+  else {
+    fail++;
+    fails.push(`${t.id}: eligibleNow=${a.eligibleNow}/${t.eligibleNow} retAge=${a.guaranteedAtRetirementAge.outcome}/${t.retAgeOutcome} future=${future?.yearsFromNow}/${t.earliestFutureYears ?? '-'}`);
+  }
+}
+
+console.log(`Calc engine validation: ${pass} passed, ${fail} failed (of ${pass + fail}) — incl. purchase/addition eligibility + retirement planning.`);
 if (fails.length) {
   console.log('\nFailures:');
   fails.forEach((f) => console.log('  ✗ ' + f));

@@ -27,6 +27,14 @@ export const purchaseInputSchema = z.object({
   yearsOfService: z.number().min(0).max(60).optional(),
 });
 
+export const retirementInputSchema = z.object({
+  gender: z.enum(['male', 'female']),
+  age: z.number().int('Age must be a whole number.').min(18, 'Age must be at least 18.').max(120, 'Age looks out of range.'),
+  yearsOfService: z.number().min(0, 'Years of service cannot be negative.').max(60, 'Years of service looks out of range.'),
+  contributionSalary: z.number().positive().max(500000).optional(),
+  hasChildrenUnder18: z.boolean().optional(),
+});
+
 export interface ValidationFailure {
   ok: false;
   issues: string[];
@@ -46,6 +54,14 @@ export function validatePurchaseInput(
   input: unknown
 ): ValidationOk<z.infer<typeof purchaseInputSchema>> | ValidationFailure {
   const r = purchaseInputSchema.safeParse(input);
+  if (r.success) return { ok: true, value: r.data };
+  return { ok: false, issues: r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) };
+}
+
+export function validateRetirementInput(
+  input: unknown
+): ValidationOk<z.infer<typeof retirementInputSchema>> | ValidationFailure {
+  const r = retirementInputSchema.safeParse(input);
   if (r.success) return { ok: true, value: r.data };
   return { ok: false, issues: r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) };
 }

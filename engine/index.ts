@@ -14,3 +14,5 @@ export {
   earlyReductionPercent,
   determineEligibility,
 } from './calc.js';
+export { analyzeRetirement } from './retirement.js';
+export type { RetirementInput, RetirementAnalysis, Milestone } from './retirement.js';
