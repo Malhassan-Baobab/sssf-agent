@@ -132,27 +132,39 @@ for (const t of PURCHASE) {
 interface RetCase {
   id: string;
   i: { gender: Gender; age: number; yearsOfService: number; hasChildrenUnder18?: boolean };
-  eligibleNow: boolean;
-  earliestFutureYears?: number; // soonest milestone with yearsFromNow > 0
-  retAgeOutcome: 'pension' | 'gratuity';
+  now: boolean;
+  nowType: string;
+  fy?: number; // soonest future milestone years
+  fType?: string; // its type
+  ret: 'pension' | 'gratuity';
 }
 const RET: RetCase[] = [
-  { id: 'RT01', i: { gender: 'male', age: 50, yearsOfService: 20 }, eligibleNow: true, earliestFutureYears: 5, retAgeOutcome: 'pension' },
-  { id: 'RT02', i: { gender: 'male', age: 45, yearsOfService: 12 }, eligibleNow: false, earliestFutureYears: 8, retAgeOutcome: 'pension' },
-  { id: 'RT03', i: { gender: 'female', age: 47, yearsOfService: 18 }, eligibleNow: false, earliestFutureYears: 2, retAgeOutcome: 'pension' },
-  { id: 'RT04', i: { gender: 'female', age: 47, yearsOfService: 18, hasChildrenUnder18: true }, eligibleNow: true, retAgeOutcome: 'pension' },
-  { id: 'RT05', i: { gender: 'male', age: 62, yearsOfService: 12 }, eligibleNow: false, earliestFutureYears: 3, retAgeOutcome: 'gratuity' },
+  { id: 'RT01 M44/20', i: { gender: 'male', age: 44, yearsOfService: 20 }, now: true, nowType: 'reduced', fy: 11, fType: 'full', ret: 'pension' },
+  { id: 'RT02 M55/19', i: { gender: 'male', age: 55, yearsOfService: 19 }, now: false, nowType: 'none', fy: 1, fType: 'full', ret: 'pension' },
+  { id: 'RT03 M60/15', i: { gender: 'male', age: 60, yearsOfService: 15 }, now: true, nowType: 'full', ret: 'pension' },
+  { id: 'RT04 M60/14', i: { gender: 'male', age: 60, yearsOfService: 14 }, now: false, nowType: 'gratuity_only', fy: 1, fType: 'full', ret: 'gratuity' },
+  { id: 'RT05 F50/20', i: { gender: 'female', age: 50, yearsOfService: 20 }, now: true, nowType: 'full', ret: 'pension' },
+  { id: 'RT06 F49/20', i: { gender: 'female', age: 49, yearsOfService: 20 }, now: true, nowType: 'reduced', fy: 1, fType: 'full', ret: 'pension' },
+  { id: 'RT07 M30/5', i: { gender: 'male', age: 30, yearsOfService: 5 }, now: false, nowType: 'none', fy: 15, fType: 'reduced', ret: 'pension' },
+  { id: 'RT08 M38/20', i: { gender: 'male', age: 38, yearsOfService: 20 }, now: true, nowType: 'reduced', fy: 17, fType: 'full', ret: 'pension' },
+  { id: 'RT09 M37/20', i: { gender: 'male', age: 37, yearsOfService: 20 }, now: false, nowType: 'none', fy: 1, fType: 'reduced', ret: 'pension' },
+  { id: 'RT10 F44/15+kids', i: { gender: 'female', age: 44, yearsOfService: 15, hasChildrenUnder18: true }, now: false, nowType: 'none', fy: 1, fType: 'full', ret: 'pension' },
+  { id: 'RT11 F45/15+kids', i: { gender: 'female', age: 45, yearsOfService: 15, hasChildrenUnder18: true }, now: true, nowType: 'full', ret: 'pension' },
+  { id: 'RT12 F45/15 noKids', i: { gender: 'female', age: 45, yearsOfService: 15 }, now: false, nowType: 'none', fy: 5, fType: 'full', ret: 'pension' },
 ];
 for (const t of RET) {
   const a = analyzeRetirement(t.i);
-  const future = a.milestones.filter((m) => m.yearsFromNow > 0)[0];
-  const okElig = a.eligibleNow === t.eligibleNow;
-  const okRet = a.guaranteedAtRetirementAge.outcome === t.retAgeOutcome;
-  const okFuture = t.earliestFutureYears == null || future?.yearsFromNow === t.earliestFutureYears;
-  if (okElig && okRet && okFuture) pass++;
+  const fut = a.milestones.filter((m) => m.yearsFromNow > 0)[0];
+  const ok =
+    a.eligibleNow === t.now &&
+    a.nowType === t.nowType &&
+    (t.fy == null || fut?.yearsFromNow === t.fy) &&
+    (t.fType == null || fut?.type === t.fType) &&
+    a.guaranteedAtRetirementAge.outcome === t.ret;
+  if (ok) pass++;
   else {
     fail++;
-    fails.push(`${t.id}: eligibleNow=${a.eligibleNow}/${t.eligibleNow} retAge=${a.guaranteedAtRetirementAge.outcome}/${t.retAgeOutcome} future=${future?.yearsFromNow}/${t.earliestFutureYears ?? '-'}`);
+    fails.push(`${t.id}: now=${a.eligibleNow}/${t.now} type=${a.nowType}/${t.nowType} fut=${fut?.yearsFromNow}:${fut?.type}/${t.fy ?? '-'}:${t.fType ?? '-'} ret=${a.guaranteedAtRetirementAge.outcome}/${t.ret}`);
   }
 }
 

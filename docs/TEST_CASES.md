@@ -11,6 +11,7 @@ Numbers are AED. Reruns: `npm run test:calc`, `npx tsx eval/run-eval.ts`, `npx t
 | 1. Calc engine (oracle) | Pension / EoS / reward / early-reduction vs `Calc_TestCases.xlsx`, corrected to the law | **17/17** |
 | 2. Calc engine (formula) | Purchase/addition cost formula | **5/5** |
 | 3. Calc engine (eligibility) | Purchase/addition caps & min-service | **6/6** |
+| 3b. Retirement planning | "When can I retire" eligibility timing & purchase advice (boundaries) | **12/12** |
 | 4. Policy citation eval | Right article cited (AR+EN) | **13/14** * |
 | 5. Abstention eval | Declines out-of-domain, no leaks | **3/3**, 0 leaks |
 | 6. E2E scenarios | PII / ambiguous / out-of-range / on-behalf / confirm-gate | **5/5** |
@@ -26,7 +27,7 @@ Numbers are AED. Reruns: `npm run test:calc`, `npx tsx eval/run-eval.ts`, `npx t
 
 ---
 
-## 1–3. Deterministic calc engine — 28/28 (`engine/calc.test.ts`)
+## 1–3b. Deterministic calc engine — 40/40 (`engine/calc.test.ts`)
 
 ### Pension / End-of-Service (oracle, law-corrected)
 | ID | Case | Input | Expected | Result |
@@ -71,6 +72,25 @@ Numbers are AED. Reruns: `npm run test:calc`, `npx tsx eval/run-eval.ts`, `npx t
 > Note: the oracle spreadsheet's own Expected/Actual columns are wrong on several rows
 > (e.g. TC10 marks a non-eligible case as a pension). The engine follows the law; SSSF
 > sign-off pending (Notion 06).
+
+### Retirement planning — 12/12 (`analyzeRetirement`, boundary cases)
+For a still-working person: eligible now? earliest future milestone (years → type)? outcome at retirement age?
+| ID | Profile | Eligible now | Earliest future | At retirement age |
+|---|---|---|---|---|
+| RT01 | M, 44, 20y | reduced now | full at 55 (11y) | pension |
+| RT02 | M, 55, 19y | no | full in 1y (age 56, 20y) | pension |
+| RT03 | M, 60, 15y | full now | — | pension |
+| RT04 | M, 60, 14y | gratuity only | pension in 1y (15y) | gratuity |
+| RT05 | F, 50, 20y | full now | — | pension |
+| RT06 | F, 49, 20y | reduced now | full at 50 (1y) | pension |
+| RT07 | M, 30, 5y | no | reduced in 15y (age 45, 20y) | pension |
+| RT08 | M, 38, 20y | reduced now | full at 55 (17y) | pension |
+| RT09 | M, 37, 20y | no | reduced in 1y (age 38) | pension |
+| RT10 | F, 44, 15y, +children | no | full in 1y (age 45, Art.19ه) | pension |
+| RT11 | F, 45, 15y, +children | full now | — | pension |
+| RT12 | F, 45, 15y, no children | no | full at 50 (5y) | pension |
+
+Conversational checks (live): "when can I retire" (still working) → forward-looking milestones; "I retired last month…" → routed to final calculation (24,000 for M/62/25y/30000); young "retire now" → "not possible, earliest in N years"; purchase advice suppressed when pension already at the 17,500 floor.
 
 ## 4–5. Policy & abstention eval — `eval/gold.jsonl`
 14 policy questions (AR+EN) with expected articles + 3 out-of-domain.
