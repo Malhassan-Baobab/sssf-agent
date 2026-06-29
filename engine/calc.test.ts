@@ -9,6 +9,7 @@
  */
 import { calculate, calculatePurchase } from './calc.js';
 import { analyzeRetirement } from './retirement.js';
+import { validateName, normalizeUaeMobile } from './validate.js';
 import type { CalcInput, Gender } from './types.js';
 
 interface PensionCase {
@@ -168,7 +169,26 @@ for (const t of RET) {
   }
 }
 
-console.log(`Calc engine validation: ${pass} passed, ${fail} failed (of ${pass + fail}) — incl. purchase/addition eligibility + retirement planning.`);
+// Contact validation (escalation): name + UAE mobile.
+const nameCases: Array<[string, boolean]> = [
+  ['idontknow', false], ['abc050', false], ['Mo', false], ['John', false],
+  ['Mohammed Ali', true], ['محمد علي', true], ['John Doe', true],
+];
+for (const [n, exp] of nameCases) {
+  if (validateName(n) === exp) pass++;
+  else { fail++; fails.push(`name "${n}": got ${validateName(n)} expected ${exp}`); }
+}
+const mobileCases: Array<[string, string | null]> = [
+  ['1234', null], ['abc050', null], ['050123456789', null], ['05012345', null],
+  ['0501234567', '+971501234567'], ['+971 50 123 4567', '+971501234567'],
+  ['971501234567', '+971501234567'], ['00971501234567', '+971501234567'],
+];
+for (const [m, exp] of mobileCases) {
+  if (normalizeUaeMobile(m) === exp) pass++;
+  else { fail++; fails.push(`mobile "${m}": got ${normalizeUaeMobile(m)} expected ${exp}`); }
+}
+
+console.log(`Calc engine validation: ${pass} passed, ${fail} failed (of ${pass + fail}) — incl. purchase/addition eligibility, retirement planning, contact validation.`);
 if (fails.length) {
   console.log('\nFailures:');
   fails.forEach((f) => console.log('  ✗ ' + f));

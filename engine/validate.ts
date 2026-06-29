@@ -65,3 +65,29 @@ export function validateRetirementInput(
   if (r.success) return { ok: true, value: r.data };
   return { ok: false, issues: r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) };
 }
+
+/**
+ * Validate a person's full name: letters only (Arabic or Latin), at least two
+ * parts (first + last), each >= 2 letters. Rejects placeholders like
+ * "idontknow", single tokens, and anything with digits/symbols.
+ */
+export function validateName(name: string): boolean {
+  const n = (name ?? '').trim();
+  return /^[A-Za-z؀-ۿ]{2,}(?:[\s'’-]+[A-Za-z؀-ۿ]{2,})+$/.test(n);
+}
+
+/**
+ * Normalize and validate a UAE mobile number. Accepts local (05XXXXXXXX) or
+ * international (+9715XXXXXXXX / 009715XXXXXXXX / 9715XXXXXXXX), with spaces,
+ * dashes, parentheses. Returns the canonical +9715XXXXXXXX, or null if invalid.
+ * Rejects "1234", letters, and wrong-length numbers.
+ */
+export function normalizeUaeMobile(mobile: string): string | null {
+  let d = (mobile ?? '').replace(/[\s\-().]/g, '');
+  if (!/^\+?\d+$/.test(d)) return null; // contains letters/symbols
+  d = d.replace(/^\+/, '').replace(/^00/, '');
+  const local = d.startsWith('971') ? d.slice(3) : d;
+  // local must be 05XXXXXXXX (10) or 5XXXXXXXX (9): optional 0, then 5 + 8 digits.
+  if (!/^0?5\d{8}$/.test(local)) return null;
+  return '+971' + local.replace(/^0/, '');
+}

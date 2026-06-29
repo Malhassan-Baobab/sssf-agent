@@ -6,7 +6,13 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { calculate, calculatePurchase, analyzeRetirement } from '../engine/index.js';
-import { validateCalcInput, validatePurchaseInput, validateRetirementInput } from '../engine/validate.js';
+import {
+  validateCalcInput,
+  validatePurchaseInput,
+  validateRetirementInput,
+  validateName,
+  normalizeUaeMobile,
+} from '../engine/validate.js';
 import { Retriever } from './retriever.js';
 
 export const toolDefs: Anthropic.Tool[] = [
@@ -167,11 +173,18 @@ export async function executeTool(
 
     case 'raise_support_request': {
       const name = String(input.name ?? '').trim();
-      const mobile = String(input.mobile ?? '').trim();
-      if (!name || !mobile) {
+      const mobileRaw = String(input.mobile ?? '').trim();
+      const nameOk = validateName(name);
+      const mobile = normalizeUaeMobile(mobileRaw);
+      if (!nameOk || !mobile) {
         return JSON.stringify({
-          error: 'missing_contact',
-          message: 'Name and mobile number are both required. Ask the user for the missing one before raising the request.',
+          error: 'invalid_contact',
+          nameValid: nameOk,
+          mobileValid: !!mobile,
+          message:
+            'Do NOT save yet. In the user\'s language, ask again only for the invalid field(s). ' +
+            (!nameOk ? 'Name must be the full name (first and last), letters only — re-ask for it. ' : '') +
+            (!mobile ? 'Mobile must be a valid UAE number (05XXXXXXXX, or +9715XXXXXXXX) — re-ask for it. ' : ''),
         });
       }
       const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
