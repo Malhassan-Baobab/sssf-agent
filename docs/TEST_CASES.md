@@ -15,6 +15,7 @@ Numbers are AED. Reruns: `npm run test:calc`, `npx tsx eval/run-eval.ts`, `npx t
 | 3c. Input validation | Impossible/illegal inputs rejected; gender normalize | **9/9** |
 | 3d. Contact validation | UAE mobile + full-name | **15/15** |
 | 3e. Oracle / purchase / sector | Final-Version pin (24,000); actual-vs-purchased split; private-only salary bounds | **6/6** |
+| 3f. Dialect & dialogue state | Emirati lexicon, sticky slots, هي=yes-not-gender, intent, EoS routing | **30/30** (`npm run test:dialogue`) |
 | 4. Policy citation eval | Right article cited (AR+EN) | **13/14** * |
 | 5. Abstention eval | Declines out-of-domain, no leaks | **3/3**, 0 leaks |
 | 6. E2E scenarios | PII / ambiguous / out-of-range / on-behalf / confirm-gate | **5/5** |
