@@ -35,7 +35,7 @@ function buildParseHint(msg: string): string {
 
 export interface AgentTurn {
   reply: string;
-  toolCalls: Array<{ name: string; input: unknown }>;
+  toolCalls: Array<{ name: string; input: unknown; result?: string }>;
 }
 
 export class Orchestrator {
@@ -90,8 +90,8 @@ export class Orchestrator {
 
       const results: Anthropic.ToolResultBlockParam[] = [];
       for (const tu of toolUses) {
-        toolCalls.push({ name: tu.name, input: tu.input });
         const out = await executeTool(tu.name, tu.input as Record<string, unknown>, this.ctx);
+        toolCalls.push({ name: tu.name, input: tu.input, result: out });
         results.push({ type: 'tool_result', tool_use_id: tu.id, content: out });
       }
       this.history.push({ role: 'user', content: results });

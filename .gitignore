@@ -19,3 +19,6 @@ build/
 Thumbs.db
 *.log
 .vscode/settings.json
+
+# Generated eval reports
+eval/reports/
