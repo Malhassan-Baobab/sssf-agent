@@ -1,75 +1,143 @@
 /**
- * Input validation for the calc tool boundary. The orchestrator passes
- * model-supplied inputs here before any computation, so a typo or an
- * out-of-range value becomes a clarifying question instead of a garbage number.
- * Bounds are deliberately permissive — they catch nonsense, not edge cases.
+ * Deterministic input validation — runs BEFORE any eligibility/calc.
+ * The model never overrides these results. Two outcomes:
+ *  - reject: hard, impossible/illegal inputs — cannot proceed.
+ *  - warnings: soft, implausible inputs — proceed only after explicit user
+ *    confirmation (tools pass confirmedPlausibility:true to bypass).
+ * Rules grounded in Law 5/2018: min subscription age 18 (Art. 3); service
+ * cannot start before 18, so max YOS = age − 18; private-sector salary
+ * bounds 4,000–70,000 (Art. 1 راتب حساب الاشتراك).
  */
-import { z } from 'zod';
 
-export const calcInputSchema = z.object({
-  caseType: z.enum(['resignation', 'retirement_age', 'death', 'total_disability', 'unfit', 'dismissal', 'other']),
-  gender: z.enum(['male', 'female']),
-  age: z.number().int('Age must be a whole number.').min(18, 'Age must be at least 18.').max(120, 'Age looks out of range.'),
-  yearsOfService: z.number().min(0, 'Years of service cannot be negative.').max(60, 'Years of service looks out of range.'),
-  contributionSalary: z
-    .number()
-    .positive('Salary must be greater than zero.')
-    .max(500000, 'Salary looks out of range — please re-check.'),
-  hasChildrenUnder18: z.boolean().optional(),
-  isWorkInjury: z.boolean().optional(),
-});
+export type Gender = 'male' | 'female';
 
-export const purchaseInputSchema = z.object({
-  kind: z.enum(['purchase', 'addition']),
-  contributionSalary: z.number().positive('Salary must be greater than zero.').max(500000, 'Salary looks out of range.'),
-  years: z.number().positive('Years must be greater than zero.').max(40, 'Years looks out of range.'),
-  gender: z.enum(['male', 'female']),
-  yearsOfService: z.number().min(0).max(60).optional(),
-});
-
-export const retirementInputSchema = z.object({
-  gender: z.enum(['male', 'female']),
-  age: z.number().int('Age must be a whole number.').min(18, 'Age must be at least 18.').max(120, 'Age looks out of range.'),
-  yearsOfService: z.number().min(0, 'Years of service cannot be negative.').max(60, 'Years of service looks out of range.'),
-  contributionSalary: z.number().positive().max(500000).optional(),
-  hasChildrenUnder18: z.boolean().optional(),
-});
-
-export interface ValidationFailure {
-  ok: false;
-  issues: string[];
-}
-export interface ValidationOk<T> {
-  ok: true;
-  value: T;
+export interface Profile {
+  gender: Gender;
+  age: number;
+  yearsOfService: number;
+  contributionSalary?: number;
 }
 
-export function validateCalcInput(input: unknown): ValidationOk<z.infer<typeof calcInputSchema>> | ValidationFailure {
-  const r = calcInputSchema.safeParse(input);
-  if (r.success) return { ok: true, value: r.data };
-  return { ok: false, issues: r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) };
+export type Validated<T> =
+  | { ok: true; value: T; warnings: string[] }
+  | { ok: false; reject: string[] };
+
+const MIN_AGE = 18; // Art. 3
+const MAX_AGE = 100;
+const MAX_YOS_ABS = 50; // beyond this, confirm (implausible career)
+const SALARY_MIN = 4000; // Art. 1 (private sector)
+const SALARY_MAX = 70000;
+
+/** Normalize a free-text gender to male/female, tolerating typos; null if unclear. */
+export function normalizeGender(raw: unknown): Gender | null {
+  const s = String(raw ?? '').trim().toLowerCase();
+  if (!s) return null;
+  const male = ['male', 'm', 'man', 'men', 'boy', 'ذكر', 'ضكر', 'ذكَر', 'رجل', 'راجل', 'ولد', 'ذ'];
+  const female = ['female', 'f', 'woman', 'women', 'girl', 'أنثى', 'انثى', 'انثي', 'أنثي', 'امرأة', 'مرأة', 'إمرأة', 'بنت', 'أ', 'ا'];
+  if (male.includes(s)) return 'male';
+  if (female.includes(s)) return 'female';
+  return null;
 }
 
-export function validatePurchaseInput(
-  input: unknown
-): ValidationOk<z.infer<typeof purchaseInputSchema>> | ValidationFailure {
-  const r = purchaseInputSchema.safeParse(input);
-  if (r.success) return { ok: true, value: r.data };
-  return { ok: false, issues: r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) };
+const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
+
+/** Validate a pension/eligibility profile (gender, age, YOS, optional salary). */
+export function validateProfile(raw: {
+  gender?: unknown;
+  age?: unknown;
+  yearsOfService?: unknown;
+  contributionSalary?: unknown;
+}): Validated<Profile> {
+  const reject: string[] = [];
+  const warnings: string[] = [];
+
+  const gender = normalizeGender(raw.gender);
+  if (!gender) reject.push('Gender is unclear — it must be male or female (ذكر/أنثى). Ask once more; if still unclear, offer a human officer.');
+
+  const age = raw.age;
+  let ageOk = false;
+  if (!isNum(age) || !Number.isInteger(age)) reject.push('Age must be a whole number.');
+  else if (age < MIN_AGE) reject.push(`Age must be at least ${MIN_AGE} — the minimum subscription age (Art. 3).`);
+  else if (age > MAX_AGE) reject.push(`Age above ${MAX_AGE} is not valid — please re-check.`);
+  else ageOk = true;
+
+  const yos = raw.yearsOfService;
+  if (!isNum(yos)) reject.push('Years of service must be a number.');
+  else if (yos < 0) reject.push('Years of service cannot be negative.');
+  else if (ageOk) {
+    const maxYos = (age as number) - MIN_AGE;
+    if (yos > maxYos)
+      reject.push(
+        `Years of service cannot exceed ${maxYos} for age ${age} — service cannot start before age ${MIN_AGE} (Art. 3). Please re-check the years or the age.`
+      );
+    else if (yos > MAX_YOS_ABS) warnings.push(`${yos} years of service is unusually long — please confirm it is correct.`);
+  }
+
+  let salary: number | undefined;
+  if (raw.contributionSalary !== undefined && raw.contributionSalary !== null && raw.contributionSalary !== '') {
+    const s = raw.contributionSalary;
+    if (!isNum(s) || s <= 0) reject.push('Salary must be a number greater than zero.');
+    else {
+      salary = s;
+      if (s < SALARY_MIN || s > SALARY_MAX)
+        warnings.push(`Salary ${s} is outside the usual private-sector range (${SALARY_MIN}–${SALARY_MAX}) — please confirm it is correct.`);
+    }
+  }
+
+  if (reject.length) return { ok: false, reject };
+  return { ok: true, value: { gender: gender!, age: age as number, yearsOfService: yos as number, contributionSalary: salary }, warnings };
 }
 
-export function validateRetirementInput(
-  input: unknown
-): ValidationOk<z.infer<typeof retirementInputSchema>> | ValidationFailure {
-  const r = retirementInputSchema.safeParse(input);
-  if (r.success) return { ok: true, value: r.data };
-  return { ok: false, issues: r.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`) };
+export interface PurchaseProfile {
+  kind: 'purchase' | 'addition';
+  gender: Gender;
+  years: number;
+  contributionSalary: number;
+  yearsOfService?: number;
+}
+
+/** Validate a purchase/addition request. */
+export function validatePurchase(raw: {
+  kind?: unknown;
+  gender?: unknown;
+  years?: unknown;
+  contributionSalary?: unknown;
+  yearsOfService?: unknown;
+}): Validated<PurchaseProfile> {
+  const reject: string[] = [];
+  const warnings: string[] = [];
+
+  const kind = raw.kind === 'addition' ? 'addition' : raw.kind === 'purchase' ? 'purchase' : null;
+  if (!kind) reject.push('Specify whether this is a purchase or an addition of service.');
+
+  const gender = normalizeGender(raw.gender);
+  if (!gender) reject.push('Gender is unclear — it must be male or female (ذكر/أنثى).');
+
+  const years = raw.years;
+  if (!isNum(years) || years <= 0) reject.push('Number of years to buy/add must be greater than zero.');
+  else if (years > MAX_YOS_ABS) reject.push('Number of years looks out of range.');
+
+  const s = raw.contributionSalary;
+  let salary = 0;
+  if (!isNum(s) || s <= 0) reject.push('Salary must be a number greater than zero.');
+  else {
+    salary = s;
+    if (s < SALARY_MIN || s > SALARY_MAX) warnings.push(`Salary ${s} is outside the usual private-sector range (${SALARY_MIN}–${SALARY_MAX}) — please confirm.`);
+  }
+
+  let yos: number | undefined;
+  if (raw.yearsOfService !== undefined && raw.yearsOfService !== null && raw.yearsOfService !== '') {
+    if (!isNum(raw.yearsOfService) || raw.yearsOfService < 0 || raw.yearsOfService > 60) reject.push('Current years of service looks out of range.');
+    else yos = raw.yearsOfService;
+  }
+
+  if (reject.length) return { ok: false, reject };
+  return { ok: true, value: { kind: kind!, gender: gender!, years: years as number, contributionSalary: salary, yearsOfService: yos }, warnings };
 }
 
 /**
- * Validate a person's full name: letters only (Arabic or Latin), at least two
- * parts (first + last), each >= 2 letters. Rejects placeholders like
- * "idontknow", single tokens, and anything with digits/symbols.
+ * Full name: letters only (Arabic or Latin), at least two parts, each >= 2.
+ * Rejects "idontknow", single tokens, anything with digits/symbols.
  */
 export function validateName(name: string): boolean {
   const n = (name ?? '').trim();
@@ -77,17 +145,14 @@ export function validateName(name: string): boolean {
 }
 
 /**
- * Normalize and validate a UAE mobile number. Accepts local (05XXXXXXXX) or
- * international (+9715XXXXXXXX / 009715XXXXXXXX / 9715XXXXXXXX), with spaces,
- * dashes, parentheses. Returns the canonical +9715XXXXXXXX, or null if invalid.
- * Rejects "1234", letters, and wrong-length numbers.
+ * Normalize+validate a UAE mobile: local 05XXXXXXXX or intl +9715XXXXXXXX
+ * (with/without 00/971, spaces/dashes). Returns +9715XXXXXXXX or null.
  */
 export function normalizeUaeMobile(mobile: string): string | null {
   let d = (mobile ?? '').replace(/[\s\-().]/g, '');
-  if (!/^\+?\d+$/.test(d)) return null; // contains letters/symbols
+  if (!/^\+?\d+$/.test(d)) return null;
   d = d.replace(/^\+/, '').replace(/^00/, '');
   const local = d.startsWith('971') ? d.slice(3) : d;
-  // local must be 05XXXXXXXX (10) or 5XXXXXXXX (9): optional 0, then 5 + 8 digits.
   if (!/^0?5\d{8}$/.test(local)) return null;
   return '+971' + local.replace(/^0/, '');
 }

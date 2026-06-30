@@ -7,13 +7,33 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { createClient } from '@supabase/supabase-js';
 import { calculate, calculatePurchase, analyzeRetirement } from '../engine/index.js';
 import {
-  validateCalcInput,
-  validatePurchaseInput,
-  validateRetirementInput,
+  validateProfile,
+  validatePurchase,
   validateName,
   normalizeUaeMobile,
 } from '../engine/validate.js';
 import { Retriever } from './retriever.js';
+
+/** Standard responses when the deterministic validator blocks a calc. */
+function rejectResponse(reject: string[]): string {
+  return JSON.stringify({
+    error: 'invalid_input',
+    blocked: true,
+    reasons: reject,
+    message:
+      'The deterministic validator rejected these inputs — you CANNOT proceed or override this. ' +
+      'Tell the user the reason in their language and ask for a corrected value.',
+  });
+}
+function confirmResponse(warnings: string[]): string {
+  return JSON.stringify({
+    error: 'needs_confirmation',
+    warnings,
+    message:
+      'Do NOT compute yet. Relay the warning in the user\'s language and ask them to confirm the value is correct. ' +
+      'Only if they confirm, call again with confirmedPlausibility: true.',
+  });
+}
 
 export const toolDefs: Anthropic.Tool[] = [
   {
@@ -31,7 +51,7 @@ export const toolDefs: Anthropic.Tool[] = [
   {
     name: 'calculate_pension_or_eos',
     description:
-      'Deterministically compute pension, end-of-service gratuity, early-retirement reduced pension, and reward. Call ONLY after collecting and reading back the inputs to the user. Returns amounts with the law articles applied. Do not compute any amount yourself.',
+      'Deterministically compute the pension, end-of-service gratuity, and reward. Call ONLY after reading the inputs back and the user confirms. Returns amounts with the law articles applied. Do not compute or estimate any amount yourself, and do not characterise the pension as full or reduced — just present the figure(s) returned with the article.',
     input_schema: {
       type: 'object',
       properties: {
@@ -40,12 +60,13 @@ export const toolDefs: Anthropic.Tool[] = [
           enum: ['resignation', 'retirement_age', 'death', 'total_disability', 'unfit', 'dismissal', 'other'],
           description: 'Reason service ended (Art. 19).',
         },
-        gender: { type: 'string', enum: ['male', 'female'] },
+        gender: { type: 'string', description: "The user's stated gender, any wording (validated/normalized server-side)." },
         age: { type: 'number', description: 'Age in years.' },
         yearsOfService: { type: 'number', description: 'Contribution years (incl. added/purchased).' },
         contributionSalary: { type: 'number', description: 'راتب حساب المعاش, monthly AED.' },
         hasChildrenUnder18: { type: 'boolean', description: 'Female resignation case (Art. 19 ه).' },
         isWorkInjury: { type: 'boolean', description: 'Work-injury death/disability (Art. 22).' },
+        confirmedPlausibility: { type: 'boolean', description: 'Set true only after the user confirmed a value the validator flagged as unusual.' },
       },
       required: ['caseType', 'gender', 'age', 'yearsOfService', 'contributionSalary'],
     },
@@ -60,8 +81,9 @@ export const toolDefs: Anthropic.Tool[] = [
         kind: { type: 'string', enum: ['purchase', 'addition'] },
         contributionSalary: { type: 'number', description: 'Monthly AED.' },
         years: { type: 'number', description: 'Years to purchase or add.' },
-        gender: { type: 'string', enum: ['male', 'female'] },
+        gender: { type: 'string', description: "The user's stated gender, any wording (validated server-side)." },
         yearsOfService: { type: 'number', description: 'Current service years (purchase eligibility needs >= 20).' },
+        confirmedPlausibility: { type: 'boolean', description: 'Set true only after the user confirmed a flagged value.' },
       },
       required: ['kind', 'contributionSalary', 'years', 'gender'],
     },
@@ -69,15 +91,15 @@ export const toolDefs: Anthropic.Tool[] = [
   {
     name: 'analyze_retirement',
     description:
-      "Retirement-eligibility PLANNER for a person who is still working. Use this when the user asks 'when can I retire', whether they qualify, or gives their gender/age/years (and optionally salary) WITHOUT saying their service already ended. Returns: whether they qualify for a pension today, the earliest dates/ages they qualify (and what's blocking it), what happens at retirement age, and whether buying nominal service helps. Use calculate_pension_or_eos instead only when the person's service has ALREADY ended and they want the final figure.",
+      "Retirement-eligibility PLANNER for a person who is still working. Use this when the user asks 'when can I retire', whether they qualify, or gives their gender/age/years WITHOUT saying their service already ended. Returns: whether a pension is payable today, the earliest Art.19 milestones (and the exact years still needed), what happens at retirement age, and whether buying nominal service is available. It returns NO amounts and never labels a pension full/reduced — to give a figure, ask the user and then call calculate_pension_or_eos. Use calculate_pension_or_eos (not this) only when service has ALREADY ended.",
     input_schema: {
       type: 'object',
       properties: {
-        gender: { type: 'string', enum: ['male', 'female'] },
+        gender: { type: 'string', description: "The user's stated gender, any wording (validated server-side)." },
         age: { type: 'number', description: 'Current age in years.' },
         yearsOfService: { type: 'number', description: 'Current contribution years so far.' },
-        contributionSalary: { type: 'number', description: 'Optional monthly salary, for an amount illustration.' },
         hasChildrenUnder18: { type: 'boolean', description: 'For women (Art. 19 ه path).' },
+        confirmedPlausibility: { type: 'boolean', description: 'Set true only after the user confirmed a flagged value.' },
       },
       required: ['gender', 'age', 'yearsOfService'],
     },
@@ -136,39 +158,48 @@ export async function executeTool(
     }
 
     case 'calculate_pension_or_eos': {
-      const v = validateCalcInput(input);
-      if (!v.ok) {
-        return JSON.stringify({
-          error: 'invalid_input',
-          issues: v.issues,
-          message: 'One or more inputs look out of range. Ask the user to re-check before computing.',
-        });
-      }
-      return JSON.stringify(calculate(v.value));
+      const v = validateProfile(input);
+      if (!v.ok) return rejectResponse(v.reject);
+      if (v.warnings.length && input.confirmedPlausibility !== true) return confirmResponse(v.warnings);
+      const r = calculate({
+        caseType: input.caseType as never,
+        gender: v.value.gender,
+        age: v.value.age,
+        yearsOfService: v.value.yearsOfService,
+        contributionSalary: v.value.contributionSalary!,
+        hasChildrenUnder18: input.hasChildrenUnder18 as boolean | undefined,
+        isWorkInjury: input.isWorkInjury as boolean | undefined,
+      });
+      // Neutral payload — figures + citations only. No full/reduced labels.
+      return JSON.stringify({
+        monthlyPension: r.monthlyPension,
+        endOfService: r.endOfService,
+        reward: r.reward,
+        raisedToMinimum: r.raisedToMinimum,
+        citations: r.citations.map((c) => `${c.authority}, ${c.article}`),
+        present: 'State the figure(s) plainly with the article(s). Do NOT say full/reduced (معاش كامل/مخفض). If raisedToMinimum, you may note it was raised to the legal minimum (Art. 26). Add one short estimate-disclaimer line.',
+      });
     }
 
     case 'calculate_purchase_or_addition': {
-      const v = validatePurchaseInput(input);
-      if (!v.ok) {
-        return JSON.stringify({
-          error: 'invalid_input',
-          issues: v.issues,
-          message: 'One or more inputs look out of range. Ask the user to re-check before computing.',
-        });
-      }
+      const v = validatePurchase(input);
+      if (!v.ok) return rejectResponse(v.reject);
+      if (v.warnings.length && input.confirmedPlausibility !== true) return confirmResponse(v.warnings);
       return JSON.stringify(calculatePurchase(v.value));
     }
 
     case 'analyze_retirement': {
-      const v = validateRetirementInput(input);
-      if (!v.ok) {
-        return JSON.stringify({
-          error: 'invalid_input',
-          issues: v.issues,
-          message: 'One or more inputs look out of range. Ask the user to re-check.',
-        });
-      }
-      return JSON.stringify(analyzeRetirement(v.value));
+      const v = validateProfile(input);
+      if (!v.ok) return rejectResponse(v.reject);
+      if (v.warnings.length && input.confirmedPlausibility !== true) return confirmResponse(v.warnings);
+      return JSON.stringify(
+        analyzeRetirement({
+          gender: v.value.gender,
+          age: v.value.age,
+          yearsOfService: v.value.yearsOfService,
+          hasChildrenUnder18: input.hasChildrenUnder18 as boolean | undefined,
+        })
+      );
     }
 
     case 'raise_support_request': {

@@ -133,40 +133,61 @@ for (const t of PURCHASE) {
 interface RetCase {
   id: string;
   i: { gender: Gender; age: number; yearsOfService: number; hasChildrenUnder18?: boolean };
-  now: boolean;
-  nowType: string;
-  fy?: number; // soonest future milestone years
-  fType?: string; // its type
+  now: boolean; // pensionPayableNow
+  shortfall: number; // yearsShortfall (0 when payable now)
   ret: 'pension' | 'gratuity';
 }
 const RET: RetCase[] = [
-  { id: 'RT01 M44/20', i: { gender: 'male', age: 44, yearsOfService: 20 }, now: true, nowType: 'reduced', fy: 11, fType: 'full', ret: 'pension' },
-  { id: 'RT02 M55/19', i: { gender: 'male', age: 55, yearsOfService: 19 }, now: false, nowType: 'none', fy: 1, fType: 'full', ret: 'pension' },
-  { id: 'RT03 M60/15', i: { gender: 'male', age: 60, yearsOfService: 15 }, now: true, nowType: 'full', ret: 'pension' },
-  { id: 'RT04 M60/14', i: { gender: 'male', age: 60, yearsOfService: 14 }, now: false, nowType: 'gratuity_only', fy: 1, fType: 'full', ret: 'gratuity' },
-  { id: 'RT05 F50/20', i: { gender: 'female', age: 50, yearsOfService: 20 }, now: true, nowType: 'full', ret: 'pension' },
-  { id: 'RT06 F49/20', i: { gender: 'female', age: 49, yearsOfService: 20 }, now: true, nowType: 'reduced', fy: 1, fType: 'full', ret: 'pension' },
-  { id: 'RT07 M30/5', i: { gender: 'male', age: 30, yearsOfService: 5 }, now: false, nowType: 'none', fy: 15, fType: 'reduced', ret: 'pension' },
-  { id: 'RT08 M38/20', i: { gender: 'male', age: 38, yearsOfService: 20 }, now: true, nowType: 'reduced', fy: 17, fType: 'full', ret: 'pension' },
-  { id: 'RT09 M37/20', i: { gender: 'male', age: 37, yearsOfService: 20 }, now: false, nowType: 'none', fy: 1, fType: 'reduced', ret: 'pension' },
-  { id: 'RT10 F44/15+kids', i: { gender: 'female', age: 44, yearsOfService: 15, hasChildrenUnder18: true }, now: false, nowType: 'none', fy: 1, fType: 'full', ret: 'pension' },
-  { id: 'RT11 F45/15+kids', i: { gender: 'female', age: 45, yearsOfService: 15, hasChildrenUnder18: true }, now: true, nowType: 'full', ret: 'pension' },
-  { id: 'RT12 F45/15 noKids', i: { gender: 'female', age: 45, yearsOfService: 15 }, now: false, nowType: 'none', fy: 5, fType: 'full', ret: 'pension' },
+  { id: 'RT01 M44/20', i: { gender: 'male', age: 44, yearsOfService: 20 }, now: true, shortfall: 0, ret: 'pension' },
+  { id: 'RT02 M55/19', i: { gender: 'male', age: 55, yearsOfService: 19 }, now: false, shortfall: 1, ret: 'pension' },
+  { id: 'RT03 M60/15', i: { gender: 'male', age: 60, yearsOfService: 15 }, now: true, shortfall: 0, ret: 'pension' },
+  { id: 'RT04 M60/14', i: { gender: 'male', age: 60, yearsOfService: 14 }, now: false, shortfall: 1, ret: 'gratuity' },
+  { id: 'RT05 F50/20', i: { gender: 'female', age: 50, yearsOfService: 20 }, now: true, shortfall: 0, ret: 'pension' },
+  { id: 'RT06 F49/20', i: { gender: 'female', age: 49, yearsOfService: 20 }, now: true, shortfall: 0, ret: 'pension' },
+  { id: 'RT07 M30/5', i: { gender: 'male', age: 30, yearsOfService: 5 }, now: false, shortfall: 15, ret: 'pension' },
+  { id: 'RT08 M38/20', i: { gender: 'male', age: 38, yearsOfService: 20 }, now: true, shortfall: 0, ret: 'pension' },
+  { id: 'RT09 M37/20', i: { gender: 'male', age: 37, yearsOfService: 20 }, now: true, shortfall: 0, ret: 'pension' },
+  { id: 'RT10 F44/15+kids', i: { gender: 'female', age: 44, yearsOfService: 15, hasChildrenUnder18: true }, now: false, shortfall: 1, ret: 'pension' },
+  { id: 'RT11 F45/15+kids', i: { gender: 'female', age: 45, yearsOfService: 15, hasChildrenUnder18: true }, now: true, shortfall: 0, ret: 'pension' },
+  { id: 'RT12 F45/15 noKids', i: { gender: 'female', age: 45, yearsOfService: 15 }, now: false, shortfall: 5, ret: 'pension' },
 ];
 for (const t of RET) {
   const a = analyzeRetirement(t.i);
-  const fut = a.milestones.filter((m) => m.yearsFromNow > 0)[0];
+  // No full/reduced labels anywhere, and no "type" field. (Age 38 may legitimately
+  // appear as a person's real atAge — only the invented age-38 milestone was removed.)
+  const noLabels = !JSON.stringify(a).match(/full pension|reduced pension|معاش (كامل|مخفض)|"type"/i);
   const ok =
-    a.eligibleNow === t.now &&
-    a.nowType === t.nowType &&
-    (t.fy == null || fut?.yearsFromNow === t.fy) &&
-    (t.fType == null || fut?.type === t.fType) &&
-    a.guaranteedAtRetirementAge.outcome === t.ret;
+    a.pensionPayableNow === t.now &&
+    a.yearsShortfall === t.shortfall &&
+    a.guaranteedAtRetirementAge.outcome === t.ret &&
+    noLabels;
   if (ok) pass++;
   else {
     fail++;
-    fails.push(`${t.id}: now=${a.eligibleNow}/${t.now} type=${a.nowType}/${t.nowType} fut=${fut?.yearsFromNow}:${fut?.type}/${t.fy ?? '-'}:${t.fType ?? '-'} ret=${a.guaranteedAtRetirementAge.outcome}/${t.ret}`);
+    fails.push(`${t.id}: now=${a.pensionPayableNow}/${t.now} shortfall=${a.yearsShortfall}/${t.shortfall} ret=${a.guaranteedAtRetirementAge.outcome}/${t.ret} noLabels=${noLabels}`);
   }
+}
+
+// Deterministic input validation (must run before any calc).
+import { validateProfile } from './validate.js';
+interface VCase { id: string; raw: Record<string, unknown>; expectOk: boolean; rejectIncludes?: string }
+const VAL: VCase[] = [
+  { id: 'V1 age30/yos40 impossible', raw: { gender: 'male', age: 30, yearsOfService: 40 }, expectOk: false, rejectIncludes: '12' },
+  { id: 'V2 age17 too young', raw: { gender: 'male', age: 17, yearsOfService: 0 }, expectOk: false, rejectIncludes: '18' },
+  { id: 'V3 yos=age-18 boundary', raw: { gender: 'male', age: 30, yearsOfService: 12 }, expectOk: true },
+  { id: 'V4 gender bisexual', raw: { gender: 'bisexual', age: 40, yearsOfService: 10 }, expectOk: false, rejectIncludes: 'male or female' },
+  { id: 'V5 gender typo ضكر', raw: { gender: 'ضكر', age: 40, yearsOfService: 10 }, expectOk: true },
+  { id: 'V6 salary 0', raw: { gender: 'male', age: 40, yearsOfService: 10, contributionSalary: 0 }, expectOk: false, rejectIncludes: 'greater than zero' },
+  { id: 'V7 age 250 absurd', raw: { gender: 'male', age: 250, yearsOfService: 5 }, expectOk: false, rejectIncludes: '100' },
+  { id: 'V8 yos 999', raw: { gender: 'female', age: 40, yearsOfService: 999 }, expectOk: false },
+  { id: 'V9 valid+salary', raw: { gender: 'female', age: 50, yearsOfService: 25, contributionSalary: 20000 }, expectOk: true },
+];
+for (const t of VAL) {
+  const r = validateProfile(t.raw);
+  let ok = r.ok === t.expectOk;
+  if (ok && !r.ok && t.rejectIncludes) ok = r.reject.some((m) => m.includes(t.rejectIncludes!));
+  if (ok) pass++;
+  else { fail++; fails.push(`${t.id}: ok=${r.ok}/${t.expectOk}` + (!r.ok ? ` reject=${JSON.stringify(r.reject)}` : '')); }
 }
 
 // Contact validation (escalation): name + UAE mobile.

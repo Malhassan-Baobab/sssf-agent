@@ -16,3 +16,11 @@ export {
 } from './calc.js';
 export { analyzeRetirement } from './retirement.js';
 export type { RetirementInput, RetirementAnalysis, Milestone } from './retirement.js';
+export {
+  validateProfile,
+  validatePurchase,
+  normalizeGender,
+  validateName,
+  normalizeUaeMobile,
+} from './validate.js';
+export type { Profile, PurchaseProfile, Validated } from './validate.js';
