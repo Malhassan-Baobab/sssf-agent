@@ -21,7 +21,7 @@ interface PensionCase {
   years: number;
   salary: number;
   kids?: boolean;
-  expect: { outcome: string; pension?: number; eos?: number; reward?: number };
+  expect: { outcome: string; pension?: number; eos?: number; reward?: number; earlyReduced?: number };
   note?: string;
 }
 
@@ -36,9 +36,9 @@ const PENSION: PensionCase[] = [
   { id: 'TC08', gender: 'female', age: 50, years: 25, salary: 18000, expect: { outcome: 'pension', pension: 17500 }, note: '80%×18000=14400 floored' },
   { id: 'TC09', gender: 'male', age: 55, years: 18, salary: 15000, expect: { outcome: 'eos', eos: 622500 }, note: 'male resign needs 20 yrs; 18<20 → EoS' },
   { id: 'TC10', gender: 'female', age: 45, years: 18, salary: 15000, kids: false, expect: { outcome: 'eos', eos: 622500 }, note: 'no kids + <20yr → EoS; sheet Actual pension=17500 is a BUG' },
-  { id: 'TC11', gender: 'male', age: 50, years: 20, salary: 20000, expect: { outcome: 'pension_reduced', pension: 10500 }, note: '60% age-reduction × floored 17500' },
-  { id: 'TC12', gender: 'female', age: 45, years: 22, salary: 22000, kids: false, expect: { outcome: 'pension_reduced', pension: 8750 }, note: '50% × floored 17500' },
-  { id: 'TC13', gender: 'male', age: 50, years: 25, salary: 20000, expect: { outcome: 'pension_reduced', pension: 10500 }, note: '60% × floored 17500' },
+  { id: 'TC11', gender: 'male', age: 50, years: 20, salary: 20000, expect: { outcome: 'pension_reduced', pension: 17500, earlyReduced: 10500 }, note: 'monthlyPension=floored full 17500; early amount 10500 (60% age-reduction)' },
+  { id: 'TC12', gender: 'female', age: 45, years: 22, salary: 22000, kids: false, expect: { outcome: 'pension_reduced', pension: 17500, earlyReduced: 8750 }, note: 'monthlyPension=17500; early amount 8750 (50%)' },
+  { id: 'TC13', gender: 'male', age: 50, years: 25, salary: 20000, expect: { outcome: 'pension_reduced', pension: 17500, earlyReduced: 10500 }, note: 'monthlyPension=17500; early amount 10500 (60%)' },
   { id: 'TC14', gender: 'female', age: 45, years: 22, salary: 22000, kids: true, expect: { outcome: 'pension', pension: 17500 }, note: 'Art.19(ه): kids, ≥15yr, age≥45 → full, floored' },
   { id: 'TC15', gender: 'male', age: 55, years: 25, salary: 20000, expect: { outcome: 'pension', pension: 17500 }, note: '80%×20000=16000 floored' },
   { id: 'TC16', gender: 'female', age: 60, years: 40, salary: 25000, expect: { outcome: 'pension_and_reward', pension: 25000, reward: 125000 }, note: '100% (no floor) + reward 5×25000' },
@@ -106,7 +106,8 @@ for (const t of PENSION) {
   const okPension = t.expect.pension == null || r.monthlyPension === t.expect.pension;
   const okEos = t.expect.eos == null || r.endOfService === t.expect.eos;
   const okReward = t.expect.reward == null || r.reward === t.expect.reward;
-  if (okOutcome && okPension && okEos && okReward) {
+  const okEarly = t.expect.earlyReduced == null || r.earlyReducedPension === t.expect.earlyReduced;
+  if (okOutcome && okPension && okEos && okReward && okEarly) {
     pass++;
   } else {
     fail++;

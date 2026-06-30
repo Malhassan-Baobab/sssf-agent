@@ -178,11 +178,16 @@ export async function executeTool(
       // Neutral payload — figures + citations only. No full/reduced labels.
       return JSON.stringify({
         monthlyPension: r.monthlyPension,
+        earlyReducedPension: r.earlyReducedPension,
+        reductionPercent: r.reductionPercent,
         endOfService: r.endOfService,
         reward: r.reward,
         raisedToMinimum: r.raisedToMinimum,
         citations: r.citations.map((c) => `${c.authority}, ${c.article}`),
-        present: 'State the figure(s) plainly with the article(s). Do NOT say full/reduced (معاش كامل/مخفض). If raisedToMinimum, you may note it was raised to the legal minimum (Art. 26). Add one short estimate-disclaimer line.',
+        present:
+          'State the figure(s) plainly with the article(s). Do NOT say full/reduced (معاش كامل/مخفض). ' +
+          'If earlyReducedPension is present, the monthly pension is the main figure (paid from the qualifying age); say the amount paid until that age is earlyReducedPension (state it factually, no labels). ' +
+          'If raisedToMinimum, you may note it was raised to the legal minimum (Art. 26). Add one short estimate-disclaimer line.',
       });
     }
 

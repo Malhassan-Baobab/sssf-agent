@@ -155,6 +155,8 @@ export function calculate(input: CalcInput, c: CalcConfig = DEFAULT_CONFIG): Cal
   const elig = determineEligibility(input, c);
   const citations = [...elig.citations];
   let monthlyPension = 0;
+  let earlyReducedPension: number | undefined;
+  let reductionPercent: number | undefined;
   let endOfService = 0;
   let rewardAmt = 0;
   let raisedToMinimum = false;
@@ -171,9 +173,11 @@ export function calculate(input: CalcInput, c: CalcConfig = DEFAULT_CONFIG): Cal
     if (raisedToMinimum) citations.push(cite('Art. 26', 'minimum pension'));
 
     if (elig.outcome === 'pension_reduced') {
-      const redPct = earlyReductionPercent(input.gender, input.age, c);
-      monthlyPension = round2(monthlyPension * (redPct / 100));
-      explanation += ` Board percentage ${redPct}% applies until age ${input.gender === 'male' ? 55 : 50}.`;
+      // Per Art. 19(ج/د) + page 03: floor applied first, age% after. monthlyPension stays the
+      // floored FULL entitlement; the early amount paid until the qualifying age is separate.
+      reductionPercent = earlyReductionPercent(input.gender, input.age, c);
+      earlyReducedPension = round2(monthlyPension * (reductionPercent / 100));
+      explanation += ` A Board percentage (${reductionPercent}%) applies until age ${input.gender === 'male' ? 55 : 50}.`;
     }
 
     // Art. 23 — reward for years beyond 35 (paid alongside the capped pension).
@@ -191,6 +195,8 @@ export function calculate(input: CalcInput, c: CalcConfig = DEFAULT_CONFIG): Cal
   return {
     outcome,
     monthlyPension,
+    earlyReducedPension,
+    reductionPercent,
     endOfService,
     reward: rewardAmt,
     raisedToMinimum,

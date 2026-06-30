@@ -49,8 +49,12 @@ export interface Citation {
 
 export interface CalcResult {
   outcome: Outcome;
-  /** Monthly pension in AED (0 when EoS/not eligible). */
+  /** Monthly pension in AED — the FLOORED FULL entitlement (Art. 23/26), 0 when EoS/not eligible. */
   monthlyPension: number;
+  /** Early-retirement amount paid until the qualifying age (Art. 19 ج/د), if applicable. */
+  earlyReducedPension?: number;
+  /** Board reduction % applied for the early case (age%). */
+  reductionPercent?: number;
   /** Lump-sum end-of-service gratuity in AED (0 when pension). */
   endOfService: number;
   /** Lump-sum reward for service beyond 35 years (Art. 23). */
