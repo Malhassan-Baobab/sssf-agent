@@ -14,6 +14,7 @@ Numbers are AED. Reruns: `npm run test:calc`, `npx tsx eval/run-eval.ts`, `npx t
 | 3b. Retirement planning | Art-19 eligibility timing & shortfall (boundaries) | **12/12** |
 | 3c. Input validation | Impossible/illegal inputs rejected; gender normalize | **9/9** |
 | 3d. Contact validation | UAE mobile + full-name | **15/15** |
+| 3e. Oracle / purchase / sector | Final-Version pin (24,000); actual-vs-purchased split; private-only salary bounds | **6/6** |
 | 4. Policy citation eval | Right article cited (AR+EN) | **13/14** * |
 | 5. Abstention eval | Declines out-of-domain, no leaks | **3/3**, 0 leaks |
 | 6. E2E scenarios | PII / ambiguous / out-of-range / on-behalf / confirm-gate | **5/5** |
@@ -29,7 +30,9 @@ Numbers are AED. Reruns: `npm run test:calc`, `npx tsx eval/run-eval.ts`, `npx t
 
 ---
 
-## 1–3d. Deterministic calc engine — 64/64 (`engine/calc.test.ts`)
+## 1–3e. Deterministic calc engine — 70/70 (`engine/calc.test.ts`)
+
+**Oracle = `Final Version الحاسبة الصورة الأخيرة.xlsx` recomputation** (+ Calc.xlsx logic), cross-checked to the law. `Calc_TestCases.xlsx` is **superseded — not used**. Pinned: `calculate(retirement_age, male, 62, 25y, 30000) = 24,000` (the figure is the calculator's). Purchased/annexed service (Art. 20) is a **separate input** from actual years — it raises the pension-% basis (credited) but is not age-bounded; actual years remain capped at age−18. Salary bounds (4,000–70,000) apply to the **private sector only**.
 
 ### Pension / End-of-Service (oracle, law-corrected)
 | ID | Case | Input | Expected | Result |
