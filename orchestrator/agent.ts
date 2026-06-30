@@ -7,9 +7,31 @@ import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPT } from './systemPrompt.js';
 import { toolDefs, executeTool, type ToolContext } from './tools.js';
 import { Retriever } from './retriever.js';
+import { parseYesNo, parseGender, extractNumber } from '../engine/normalize.js';
+import { classifyIntent } from '../engine/intent.js';
 
 const MODEL = process.env.ORCHESTRATOR_MODEL ?? 'claude-sonnet-4-6';
 const MAX_TOOL_ITERATIONS = 6;
+
+/**
+ * Deterministic parse of the latest user message. This is AUTHORITATIVE for the
+ * critical slots — the model must use these canonical values and must never set
+ * the user's gender from a pronoun or an ambiguous token.
+ */
+function buildParseHint(msg: string): string {
+  const yn = parseYesNo(msg);
+  const g = parseGender(msg);
+  const n = extractNumber(msg);
+  const intent = classifyIntent(msg);
+  return [
+    "# Deterministic parse of the user's latest message (AUTHORITATIVE — use these, do not re-interpret):",
+    `- classified intent: ${intent.intent ?? 'unclear'}${intent.confident ? '' : ' (low confidence — confirm with the user before acting)'}`,
+    `- yes/no value: ${yn ?? 'not a yes/no token'}`,
+    `- explicit gender word: ${g ?? 'NONE — the message has no gender word; do NOT infer gender from it'}`,
+    `- number: ${n ?? 'none'}`,
+    "RULES: 'هي'/'هو' mean YES (affirmation), never 'she'/a gender. Set the user's gender ONLY from an explicit first-person gender word; never from a pronoun, a yes/no, or a number. Gender is sticky — once set, keep it unless the user explicitly self-corrects (e.g. 'أنا ذكر/أنثى').",
+  ].join('\n');
+}
 
 export interface AgentTurn {
   reply: string;
@@ -39,12 +61,14 @@ export class Orchestrator {
   async send(userMessage: string): Promise<AgentTurn> {
     this.history.push({ role: 'user', content: userMessage });
     const toolCalls: AgentTurn['toolCalls'] = [];
+    // Deterministic parse of THIS turn's message, injected as authoritative context.
+    const systemForTurn = SYSTEM_PROMPT + '\n\n' + buildParseHint(userMessage);
 
     for (let i = 0; i < MAX_TOOL_ITERATIONS; i++) {
       const resp = await this.client.messages.create({
         model: MODEL,
         max_tokens: 1500,
-        system: SYSTEM_PROMPT,
+        system: systemForTurn,
         tools: toolDefs,
         messages: this.history,
       });

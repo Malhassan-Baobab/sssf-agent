@@ -9,6 +9,8 @@
  * bounds 4,000–70,000 (Art. 1 راتب حساب الاشتراك).
  */
 
+import { parseGender } from './normalize.js';
+
 export type Gender = 'male' | 'female';
 
 export type Sector = 'government' | 'private';
@@ -37,15 +39,13 @@ const MAX_YOS_ABS = 50; // beyond this, confirm (implausible career)
 const SALARY_MIN = 4000; // Art. 1 (private sector)
 const SALARY_MAX = 70000;
 
-/** Normalize a free-text gender to male/female, tolerating typos; null if unclear. */
+/**
+ * Normalize a free-text gender to male/female via the single deterministic
+ * dialect parser (Emirati/Gulf-aware; tolerates typos; never maps هي/هو). null
+ * if unclear.
+ */
 export function normalizeGender(raw: unknown): Gender | null {
-  const s = String(raw ?? '').trim().toLowerCase();
-  if (!s) return null;
-  const male = ['male', 'm', 'man', 'men', 'boy', 'ذكر', 'ضكر', 'ذكَر', 'رجل', 'راجل', 'ولد', 'ذ'];
-  const female = ['female', 'f', 'woman', 'women', 'girl', 'أنثى', 'انثى', 'انثي', 'أنثي', 'امرأة', 'مرأة', 'إمرأة', 'بنت', 'أ', 'ا'];
-  if (male.includes(s)) return 'male';
-  if (female.includes(s)) return 'female';
-  return null;
+  return parseGender(String(raw ?? ''));
 }
 
 const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);

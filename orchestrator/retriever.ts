@@ -7,6 +7,7 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import OpenAI from 'openai';
+import { normalizeText } from '../engine/normalize.js';
 
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL ?? 'text-embedding-3-large';
 const EMBEDDING_DIM = parseInt(process.env.EMBEDDING_DIM ?? '1536', 10);
@@ -68,7 +69,10 @@ export class Retriever {
   }
 
   async retrieve(query: string, topK = 5): Promise<RetrievalBundle> {
-    const vec = await this.embed(query);
+    // Deterministic query cleanup (Arabic-Indic digits, diacritics, tatweel,
+    // dialect letter folding) before embedding — handles dialectal/typo'd input.
+    const cleaned = normalizeText(query) || query;
+    const vec = await this.embed(cleaned);
 
     const [{ data: lawHits }, { data: faqHits }] = await Promise.all([
       this.supabase.rpc('match_law_chunks', { query_embedding: vec, match_count: topK }),
