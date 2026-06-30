@@ -145,9 +145,13 @@ export function determineEligibility(input: CalcInput, c: CalcConfig = DEFAULT_C
 /** Full calculation: eligibility → pension/EoS/reward with citations. */
 export function calculate(input: CalcInput, c: CalcConfig = DEFAULT_CONFIG): CalcResult {
   const salary = input.contributionSalary;
+  const actualYears = input.yearsOfService; // age-bounded; eligibility + EoS use this
+  // Purchased nominal service (Art. 20) adds to the pension-% basis only.
+  const creditedYears = actualYears + (input.purchasedYears ?? 0);
   // Art. 22 — work-injury death/disability is computed as 35 years of service.
-  const years = input.isWorkInjury ? Math.max(input.yearsOfService, c.workInjuryAssumedYears) : input.yearsOfService;
+  const pctYears = input.isWorkInjury ? Math.max(creditedYears, c.workInjuryAssumedYears) : creditedYears;
 
+  // Eligibility (Art. 19) is decided on ACTUAL service only.
   const elig = determineEligibility(input, c);
   const citations = [...elig.citations];
   let monthlyPension = 0;
@@ -158,7 +162,8 @@ export function calculate(input: CalcInput, c: CalcConfig = DEFAULT_CONFIG): Cal
   let explanation = elig.reason;
 
   if (elig.outcome === 'pension' || elig.outcome === 'pension_reduced') {
-    const pct = pensionPercent(years, c);
+    // Pension % uses credited years (actual + purchased).
+    const pct = pensionPercent(pctYears, c);
     const floored = applyFloor(round2(salary * (pct / 100)), c);
     monthlyPension = floored.amount;
     raisedToMinimum = floored.raised;
@@ -168,17 +173,18 @@ export function calculate(input: CalcInput, c: CalcConfig = DEFAULT_CONFIG): Cal
     if (elig.outcome === 'pension_reduced') {
       const redPct = earlyReductionPercent(input.gender, input.age, c);
       monthlyPension = round2(monthlyPension * (redPct / 100));
-      explanation += ` Reduction ${redPct}% for age ${input.age}.`;
+      explanation += ` Board percentage ${redPct}% applies until age ${input.gender === 'male' ? 55 : 50}.`;
     }
 
     // Art. 23 — reward for years beyond 35 (paid alongside the capped pension).
-    rewardAmt = reward(years, salary, c);
+    rewardAmt = reward(pctYears, salary, c);
     if (rewardAmt > 0) {
       outcome = 'pension_and_reward';
       citations.push(cite('Art. 23', 'reward beyond 35 years'));
     }
   } else if (elig.outcome === 'eos') {
-    endOfService = endOfServiceGratuity(years, salary, c);
+    // End-of-service is computed on ACTUAL service (purchase needs 20y → pension, not EoS).
+    endOfService = endOfServiceGratuity(actualYears, salary, c);
     citations.push(cite('Art. 43', 'end-of-service gratuity'));
   }
 

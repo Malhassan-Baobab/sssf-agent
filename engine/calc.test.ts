@@ -1,9 +1,11 @@
 /**
- * Validation against Calc_TestCases.xlsx (the oracle).
- * Expected values here are LAW-CORRECT (Law 5/2018), derived by decoding the
- * Final Version calculator formulas. Where the spreadsheet's own
- * Expected/Actual columns disagree with the law, the law wins and the
- * divergence is noted — these are flagged for officer review (see Notion 04/06).
+ * Calc engine validation.
+ * ORACLE = the production calculator `Final Version الحاسبة الصورة الأخيرة.xlsx`
+ * (+ Calc.xlsx logic), recomputed from its formulas and cross-checked to
+ * Law 5/2018. The superseded `Calc_TestCases.xlsx` is NOT used as the oracle
+ * (its Expected/Actual columns contain errors; see Notion 03). The case IDs
+ * below are local labels, not references to that file. Every expected value
+ * here is a Final Version recomputation.
  *
  * Run: npx tsx engine/calc.test.ts
  */
@@ -209,7 +211,43 @@ for (const [m, exp] of mobileCases) {
   else { fail++; fails.push(`mobile "${m}": got ${normalizeUaeMobile(m)} expected ${exp}`); }
 }
 
-console.log(`Calc engine validation: ${pass} passed, ${fail} failed (of ${pass + fail}) — incl. purchase/addition eligibility, retirement planning, contact validation.`);
+// --- PINNED injection scenario: the figure must be the Final Version's, not the model's.
+// Final Version: male, retirement age, 25 years → 80% (60 + (25-15)*2); 80% × 30,000 = 24,000 (above the 17,500 floor).
+{
+  const r = calculate({ caseType: 'retirement_age', gender: 'male', age: 62, yearsOfService: 25, contributionSalary: 30000 });
+  if (r.monthlyPension === 24000) pass++;
+  else { fail++; fails.push(`PIN injection M/62/25y/30000: got ${r.monthlyPension} expected 24000 (Final Version)`); }
+}
+
+// --- Task 2: purchased/annexed service vs the age−18 guard.
+{
+  // age 40 / 22 actual + 5 purchased (credited 27) → ACCEPTED (purchase not age-bounded).
+  const a = validateProfile({ gender: 'male', age: 40, yearsOfService: 22, purchasedYears: 5 });
+  if (a.ok) pass++; else { fail++; fails.push(`PUR1 age40/22actual+5purchased should be accepted: ${JSON.stringify(a)}`); }
+  // age 30 / 40 actual → still REJECTED by the age−18 guard.
+  const b = validateProfile({ gender: 'male', age: 30, yearsOfService: 40 });
+  if (!b.ok) pass++; else { fail++; fails.push('PUR2 age30/40actual should be rejected'); }
+  // purchased years raise the pension % via credited years (20 actual + 5 = 25 → 80%).
+  const withP = calculate({ caseType: 'retirement_age', gender: 'male', age: 60, yearsOfService: 20, purchasedYears: 5, contributionSalary: 30000 });
+  const noP = calculate({ caseType: 'retirement_age', gender: 'male', age: 60, yearsOfService: 20, contributionSalary: 30000 });
+  if (withP.monthlyPension === 24000 && noP.monthlyPension === 21000) pass++;
+  else { fail++; fails.push(`PUR3 credited %: withPurchase=${withP.monthlyPension}(exp 24000) noPurchase=${noP.monthlyPension}(exp 21000)`); }
+  // purchase without 20 actual years is rejected (Art. 20).
+  const c2 = validateProfile({ gender: 'male', age: 45, yearsOfService: 10, purchasedYears: 3 });
+  if (!c2.ok) pass++; else { fail++; fails.push('PUR4 purchase with <20 actual should be rejected'); }
+}
+
+// --- Task 3: salary bounds are private-sector only.
+{
+  const gov = validateProfile({ gender: 'male', age: 45, yearsOfService: 20, contributionSalary: 90000, sector: 'government' });
+  const priv = validateProfile({ gender: 'male', age: 45, yearsOfService: 20, contributionSalary: 90000, sector: 'private' });
+  const govOk = gov.ok && gov.warnings.length === 0;
+  const privFlagged = priv.ok && priv.warnings.some((w) => /private-sector range/.test(w));
+  if (govOk && privFlagged) pass++;
+  else { fail++; fails.push(`SECTOR: govWarnings=${gov.ok ? gov.warnings.length : 'reject'} privFlagged=${privFlagged}`); }
+}
+
+console.log(`Calc engine validation: ${pass} passed, ${fail} failed (of ${pass + fail}) — Final Version oracle; incl. purchase split, sector bounds, validation, retirement, contact.`);
 if (fails.length) {
   console.log('\nFailures:');
   fails.forEach((f) => console.log('  ✗ ' + f));

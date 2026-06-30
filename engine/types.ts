@@ -23,10 +23,12 @@ export interface CalcInput {
   caseType: CaseType;
   gender: Gender;
   age: number; // years
-  yearsOfService: number; // actual contribution years (may include added/purchased)
+  yearsOfService: number; // ACTUAL subscription years (age-bounded). Eligibility (Art. 19) and EoS use this.
+  purchasedYears?: number; // Art. 20 nominal service — adds to the pension-% basis only (not age-bounded)
   contributionSalary: number; // راتب حساب المعاش (monthly, AED)
   hasChildrenUnder18?: boolean; // relevant for female resignation (Art. 19 ه)
   isWorkInjury?: boolean; // Art. 22 — assume 35 years
+  sector?: 'government' | 'private';
 }
 
 export interface PurchaseInput {

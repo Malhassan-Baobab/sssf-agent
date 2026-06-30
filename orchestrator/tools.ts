@@ -21,8 +21,8 @@ function rejectResponse(reject: string[]): string {
     blocked: true,
     reasons: reject,
     message:
-      'The deterministic validator rejected these inputs — you CANNOT proceed or override this. ' +
-      'Tell the user the reason in their language and ask for a corrected value.',
+      'The deterministic validator rejected these inputs as impossible — you CANNOT proceed or override this. ' +
+      'Tell the user the reason in their language and ask them to CORRECT the value (there is nothing to confirm — it is impossible).',
   });
 }
 function confirmResponse(warnings: string[]): string {
@@ -30,7 +30,7 @@ function confirmResponse(warnings: string[]): string {
     error: 'needs_confirmation',
     warnings,
     message:
-      'Do NOT compute yet. Relay the warning in the user\'s language and ask them to confirm the value is correct. ' +
+      'Do NOT compute yet. The value is unusual but possible. Relay the warning in the user\'s language and ask them to CONFIRM it is correct or CORRECT it. ' +
       'Only if they confirm, call again with confirmedPlausibility: true.',
   });
 }
@@ -62,8 +62,10 @@ export const toolDefs: Anthropic.Tool[] = [
         },
         gender: { type: 'string', description: "The user's stated gender, any wording (validated/normalized server-side)." },
         age: { type: 'number', description: 'Age in years.' },
-        yearsOfService: { type: 'number', description: 'Contribution years (incl. added/purchased).' },
+        yearsOfService: { type: 'number', description: 'ACTUAL subscription years only (do NOT add purchased/annexed years here).' },
+        purchasedYears: { type: 'number', description: 'Purchased/annexed nominal service (Art. 20), separate from actual years. Optional.' },
         contributionSalary: { type: 'number', description: 'راتب حساب المعاش, monthly AED.' },
+        sector: { type: 'string', enum: ['government', 'private'], description: 'Employment sector — needed so private-sector salary bounds apply only to private.' },
         hasChildrenUnder18: { type: 'boolean', description: 'Female resignation case (Art. 19 ه).' },
         isWorkInjury: { type: 'boolean', description: 'Work-injury death/disability (Art. 22).' },
         confirmedPlausibility: { type: 'boolean', description: 'Set true only after the user confirmed a value the validator flagged as unusual.' },
@@ -82,7 +84,8 @@ export const toolDefs: Anthropic.Tool[] = [
         contributionSalary: { type: 'number', description: 'Monthly AED.' },
         years: { type: 'number', description: 'Years to purchase or add.' },
         gender: { type: 'string', description: "The user's stated gender, any wording (validated server-side)." },
-        yearsOfService: { type: 'number', description: 'Current service years (purchase eligibility needs >= 20).' },
+        yearsOfService: { type: 'number', description: 'Current actual service years (purchase eligibility needs >= 20).' },
+        sector: { type: 'string', enum: ['government', 'private'], description: 'Employment sector — private-sector salary bounds apply only to private.' },
         confirmedPlausibility: { type: 'boolean', description: 'Set true only after the user confirmed a flagged value.' },
       },
       required: ['kind', 'contributionSalary', 'years', 'gender'],
@@ -166,7 +169,9 @@ export async function executeTool(
         gender: v.value.gender,
         age: v.value.age,
         yearsOfService: v.value.yearsOfService,
+        purchasedYears: v.value.purchasedYears,
         contributionSalary: v.value.contributionSalary!,
+        sector: v.value.sector,
         hasChildrenUnder18: input.hasChildrenUnder18 as boolean | undefined,
         isWorkInjury: input.isWorkInjury as boolean | undefined,
       });

@@ -11,12 +11,21 @@
 
 export type Gender = 'male' | 'female';
 
+export type Sector = 'government' | 'private';
+
 export interface Profile {
   gender: Gender;
   age: number;
+  /** ACTUAL subscription years (age-bounded). */
   yearsOfService: number;
+  /** Purchased nominal service (Art. 20) — capped, NOT age-bounded. */
+  purchasedYears: number;
   contributionSalary?: number;
+  sector?: Sector;
 }
+
+const MAX_PURCHASE_MALE = 5; // Art. 20
+const MAX_PURCHASE_FEMALE = 10;
 
 export type Validated<T> =
   | { ok: true; value: T; warnings: string[] }
@@ -41,12 +50,22 @@ export function normalizeGender(raw: unknown): Gender | null {
 
 const isNum = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 
-/** Validate a pension/eligibility profile (gender, age, YOS, optional salary). */
+/**
+ * Validate a pension/eligibility profile.
+ * - yearsOfService is ACTUAL subscription years and is age-bounded (max = age − 18).
+ * - purchasedYears (Art. 20 nominal service) is a SEPARATE input, capped 5/10,
+ *   and is NOT age-bounded; it requires >= 20 actual years to be allowed.
+ * - salary 4,000–70,000 bounds apply ONLY to the private sector (Art. 1).
+ * Hard rejects (impossible/illegal) must be CORRECTED. Warnings (implausible but
+ * possible) must be confirmed or corrected by the user.
+ */
 export function validateProfile(raw: {
   gender?: unknown;
   age?: unknown;
   yearsOfService?: unknown;
+  purchasedYears?: unknown;
   contributionSalary?: unknown;
+  sector?: unknown;
 }): Validated<Profile> {
   const reject: string[] = [];
   const warnings: string[] = [];
@@ -56,36 +75,57 @@ export function validateProfile(raw: {
 
   const age = raw.age;
   let ageOk = false;
-  if (!isNum(age) || !Number.isInteger(age)) reject.push('Age must be a whole number.');
-  else if (age < MIN_AGE) reject.push(`Age must be at least ${MIN_AGE} — the minimum subscription age (Art. 3).`);
-  else if (age > MAX_AGE) reject.push(`Age above ${MAX_AGE} is not valid — please re-check.`);
+  if (!isNum(age) || !Number.isInteger(age)) reject.push('Age must be a whole number. Please correct it.');
+  else if (age < MIN_AGE) reject.push(`Age must be at least ${MIN_AGE} — the minimum subscription age (Art. 3). Please correct it.`);
+  else if (age > MAX_AGE) reject.push(`Age above ${MAX_AGE} is not valid. Please correct it.`);
   else ageOk = true;
 
   const yos = raw.yearsOfService;
-  if (!isNum(yos)) reject.push('Years of service must be a number.');
-  else if (yos < 0) reject.push('Years of service cannot be negative.');
+  let yosOk = false;
+  if (!isNum(yos)) reject.push('Years of service must be a number. Please correct it.');
+  else if (yos < 0) reject.push('Years of service cannot be negative. Please correct it.');
   else if (ageOk) {
     const maxYos = (age as number) - MIN_AGE;
     if (yos > maxYos)
       reject.push(
-        `Years of service cannot exceed ${maxYos} for age ${age} — service cannot start before age ${MIN_AGE} (Art. 3). Please re-check the years or the age.`
+        `Actual service years cannot exceed ${maxYos} at age ${age} — service cannot start before age ${MIN_AGE} (Art. 3). Please correct the years or the age. (Purchased/added service is entered separately.)`
       );
-    else if (yos > MAX_YOS_ABS) warnings.push(`${yos} years of service is unusually long — please confirm it is correct.`);
+    else {
+      yosOk = true;
+      if (yos > MAX_YOS_ABS) warnings.push(`${yos} years of service is unusually long — please confirm it is correct, or correct it.`);
+    }
+  } else if (yos >= 0) {
+    yosOk = true; // numeric & non-negative; age failed separately
   }
+
+  // Purchased nominal service (Art. 20): capped, NOT age-bounded.
+  let purchasedYears = 0;
+  if (raw.purchasedYears !== undefined && raw.purchasedYears !== null && raw.purchasedYears !== '') {
+    const p = raw.purchasedYears;
+    const cap = gender === 'female' ? MAX_PURCHASE_FEMALE : MAX_PURCHASE_MALE;
+    if (!isNum(p) || p < 0) reject.push('Purchased years cannot be negative. Please correct it.');
+    else if (gender && p > cap) reject.push(`Purchased nominal service cannot exceed ${cap} years for ${gender} (Art. 20). Please correct it.`);
+    else if (p > 0 && yosOk && isNum(yos) && (yos as number) < 20)
+      reject.push('Purchasing nominal service requires at least 20 years of ACTUAL service (Art. 20). Please correct it.');
+    else purchasedYears = isNum(p) ? p : 0;
+  }
+
+  const sector: Sector | undefined = raw.sector === 'government' ? 'government' : raw.sector === 'private' ? 'private' : undefined;
 
   let salary: number | undefined;
   if (raw.contributionSalary !== undefined && raw.contributionSalary !== null && raw.contributionSalary !== '') {
     const s = raw.contributionSalary;
-    if (!isNum(s) || s <= 0) reject.push('Salary must be a number greater than zero.');
+    if (!isNum(s) || s <= 0) reject.push('Salary must be a number greater than zero. Please correct it.');
     else {
       salary = s;
-      if (s < SALARY_MIN || s > SALARY_MAX)
-        warnings.push(`Salary ${s} is outside the usual private-sector range (${SALARY_MIN}–${SALARY_MAX}) — please confirm it is correct.`);
+      // 4,000–70,000 are the Art. 1 PRIVATE-sector bounds; do not flag government salaries.
+      if (sector === 'private' && (s < SALARY_MIN || s > SALARY_MAX))
+        warnings.push(`Salary ${s} is outside the private-sector range (${SALARY_MIN}–${SALARY_MAX}, Art. 1) — please confirm it is correct, or correct it.`);
     }
   }
 
   if (reject.length) return { ok: false, reject };
-  return { ok: true, value: { gender: gender!, age: age as number, yearsOfService: yos as number, contributionSalary: salary }, warnings };
+  return { ok: true, value: { gender: gender!, age: age as number, yearsOfService: yos as number, purchasedYears, contributionSalary: salary, sector }, warnings };
 }
 
 export interface PurchaseProfile {
@@ -103,6 +143,7 @@ export function validatePurchase(raw: {
   years?: unknown;
   contributionSalary?: unknown;
   yearsOfService?: unknown;
+  sector?: unknown;
 }): Validated<PurchaseProfile> {
   const reject: string[] = [];
   const warnings: string[] = [];
@@ -114,15 +155,16 @@ export function validatePurchase(raw: {
   if (!gender) reject.push('Gender is unclear — it must be male or female (ذكر/أنثى).');
 
   const years = raw.years;
-  if (!isNum(years) || years <= 0) reject.push('Number of years to buy/add must be greater than zero.');
-  else if (years > MAX_YOS_ABS) reject.push('Number of years looks out of range.');
+  if (!isNum(years) || years <= 0) reject.push('Number of years to buy/add must be greater than zero. Please correct it.');
+  else if (years > MAX_YOS_ABS) reject.push('Number of years looks out of range. Please correct it.');
 
+  const sector: Sector | undefined = raw.sector === 'government' ? 'government' : raw.sector === 'private' ? 'private' : undefined;
   const s = raw.contributionSalary;
   let salary = 0;
-  if (!isNum(s) || s <= 0) reject.push('Salary must be a number greater than zero.');
+  if (!isNum(s) || s <= 0) reject.push('Salary must be a number greater than zero. Please correct it.');
   else {
     salary = s;
-    if (s < SALARY_MIN || s > SALARY_MAX) warnings.push(`Salary ${s} is outside the usual private-sector range (${SALARY_MIN}–${SALARY_MAX}) — please confirm.`);
+    if (sector === 'private' && (s < SALARY_MIN || s > SALARY_MAX)) warnings.push(`Salary ${s} is outside the private-sector range (${SALARY_MIN}–${SALARY_MAX}, Art. 1) — please confirm or correct.`);
   }
 
   let yos: number | undefined;
