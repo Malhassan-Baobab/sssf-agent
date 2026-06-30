@@ -61,6 +61,10 @@ export class Orchestrator {
   async send(userMessage: string): Promise<AgentTurn> {
     this.history.push({ role: 'user', content: userMessage });
     const toolCalls: AgentTurn['toolCalls'] = [];
+    // Abuse metric hook: log the EVENT only (no message content, no PII).
+    if (classifyIntent(userMessage).intent === 'abuse') {
+      console.warn(`[metric] abuse_event turn=${this.history.filter((m) => m.role === 'user').length}`);
+    }
     // Deterministic parse of THIS turn's message, injected as authoritative context.
     const systemForTurn = SYSTEM_PROMPT + '\n\n' + buildParseHint(userMessage);
 
